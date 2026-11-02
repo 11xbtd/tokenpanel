@@ -2,6 +2,14 @@
 
 本项目的重要变更记录在这里。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## 1.1.0 - 2026-11-02
+
+### Changed
+
+- uTools 功能指令精简为 5 个：`token`、`tokenpanel`、`AI余额`、`AI动态`、`模型排行`，修复插件市场「每个功能指令建议不超过 5 个」的发布校验。
+- 移除重复的 `TokenPanel`（与 `tokenpanel` 重复）和 `额度看板` 指令。
+- 同步 uTools 插件与浏览器版版本号为 1.1.0。
+
 ## 1.0.0 - 2026-11-02
 
 首个公开版本：uTools 插件 + 浏览器本地服务，数据只存本机。

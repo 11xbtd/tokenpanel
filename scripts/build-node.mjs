@@ -21,7 +21,7 @@ const pluginJson = {
     {
       code: 'token-panel',
       explain: '打开 AI Token 用量、AI 动态与模型排行看板',
-      cmds: ['token', 'tokenpanel', 'TokenPanel', 'AI余额', '额度看板', 'AI动态', '模型排行'],
+      cmds: ['token', 'tokenpanel', 'AI余额', 'AI动态', '模型排行'],
     },
   ],
   platform: ['win32', 'darwin', 'linux'],

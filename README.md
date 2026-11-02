@@ -41,7 +41,7 @@ npm run start
 `start.cmd` 可以双击完成同样的事：首次自动安装依赖与构建，然后打开 `http://127.0.0.1:5188`。数据写在系统固定目录（Windows：`%APPDATA%\TokenPanel`），不在项目文件夹里，所以换机器、移动项目或重装都不会丢。启动成功会打印：
 
 ```
-TokenPanel 1.0.0 已启动：http://127.0.0.1:5188
+TokenPanel 1.1.0 已启动：http://127.0.0.1:5188
 数据目录：C:\Users\<你>\AppData\Roaming\TokenPanel
 ```
 
@@ -59,7 +59,7 @@ TokenPanel 1.0.0 已启动：http://127.0.0.1:5188
 
 1. `npm install && npm run build`，产物在 `dist/utools/`。
 2. 打开 uTools → **开发者工具** → **新建项目** → 选择 `dist/utools/plugin.json` → **接入开发**。
-3. 在 uTools 搜索框输入 `token`、`tokenpanel`、`AI余额`、`额度看板`、`AI动态` 或 `模型排行` 打开。
+3. 在 uTools 搜索框输入 `token`、`tokenpanel`、`AI余额`、`AI动态` 或 `模型排行` 打开。
 4. 分发：`npm run pack:utools`，对方解压后在开发者工具里选择 `plugin.json`。上架 uTools 插件应用市场后可直接在 uTools 内安装；审核通过前，用开发者工具导入 `dist/utools/plugin.json`。
 
 插件默认单实例、窗口高度 760；宽度与是否可调由 uTools 控制。
