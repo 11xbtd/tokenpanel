@@ -1,0 +1,49 @@
+{
+  "name": "token-panel",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AI Token 用量与余额/套餐额度看板（uTools 插件 + 浏览器版）",
+  "license": "MIT",
+  "author": "TokenPanel contributors",
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "esbuild src/node/server.ts --bundle --platform=node --target=node20 --format=esm --outfile=.dev/server.mjs --sourcemap --loader:.json=json && node .dev/server.mjs",
+    "dev:web": "vite",
+    "build": "npm run build:prices && npm run build:brands && vite build && node scripts/build-node.mjs",
+    "build:prices": "node scripts/build-prices.mjs",
+    "build:brands": "node scripts/build-brands.mjs",
+    "typecheck": "tsc --noEmit",
+    "serve": "node dist/server/server.mjs",
+    "start": "node scripts/start.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "demo": "node scripts/serve-demo.mjs --fresh",
+    "pack:utools": "node scripts/pack-utools.mjs"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.5",
+    "cheerio": "^1.2.0",
+    "dayjs": "^1.11.23",
+    "echarts": "^6.1.0",
+    "hono": "^4.13.14",
+    "lucide-react": "^1.63.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@lobehub/icons-static-svg": "^1.101.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "concurrently": "^10.0.6",
+    "esbuild": "^0.28.2",
+    "jszip": "^3.10.2",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}
