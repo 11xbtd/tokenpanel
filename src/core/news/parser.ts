@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { load } from 'cheerio/slim'
 import type { NewsSource } from './catalog'
-import { NEWS_TOPICS } from './catalog'
+import { matchingNewsTopics, NEWS_TOPICS } from './catalog'
 import type { NewsCategory, NewsItem } from './types'
 
 function plain(value: string, max = 180): string {
@@ -30,7 +30,7 @@ export function newsCategories(title: string, summary: string, client = false): 
   const text = `${title} ${summary}`
   const categories: NewsCategory[] = []
   const pricingText = text.replace(/\b(?:pricing|prices?|quotas?|rate limits?)\s+(?:(?:will|remains?|are|is|stay(?:s)?|the)\s+)*(?:unchanged|same)\b/gi, '').replace(/(?:价格|定价|额度|配额)(?:保持|维持|仍然|均|暂)?不变/g, '')
-  if (/\b(pric(?:e|es|ing)|quota|rate[- ]limits?|billing|discount|subscription)\b|价格|定价|降价|涨价|额度|配额|计费|订阅/i.test(pricingText) || /\bcredits?\s+(?:for|in|on)\s+(?:codex|chatgpt|claude)\b/i.test(pricingText)) categories.push('pricing')
+  if (/\b(pric(?:e|es|ing)|quota|rate[- ]limits?|usage limits?|billing|discount|subscription)\b|价格|定价|降价|涨价|额度|配额|计费|订阅|资费|限额|限速|(?:\d+\s*(?:小时|天|周)|用量|使用|速率|请求|调用|token).{0,12}(?:限制|上限)/i.test(pricingText) || /\bcredits?\s+(?:for|in|on)\s+(?:codex|chatgpt|claude)\b/i.test(pricingText)) categories.push('pricing')
   const editorial = /model spec|system card|public benefit|\bIPO\b|\bS-1\b|\b(uses|helps|case study|responsibly|safely)\b|^how\b/i.test(title)
   const modelName = /\b(gpt[-\s]?\d|o[1345](?:\b|-)|gemini\s*\d|claude\s+(?:opus|sonnet|haiku)|kimi[-\s]?k\d|deepseek[-\s]?v\d|minimax[-\s]?(?:m|h|speech|music)\s*\d)/i
   const releaseHeading = /^(introducing|announcing|meet|new|launch|gpt|gemini|claude|kimi|deepseek|minimax|openai\s+o[1345])|\b(release|launch|update|available)\b|发布|推出|上线|更新/i.test(title)
@@ -49,7 +49,12 @@ export function parseNews(body: string, source: NewsSource, now = Date.now()): N
     if (!title || !url || !Number.isFinite(publishedAt) || publishedAt > now + 86_400_000) return
     let summary = plain(rawSummary)
     if (client && summary.toLowerCase().replace(/^release:\s*/, '') === title.toLowerCase()) summary = ''
+    const stream = source.stream ?? 'official'
+    const relatedTopicIds = stream === 'official' ? [source.topicId] : matchingNewsTopics(`${title} ${plain(rawSummary, 1800)}`)
+    if (!relatedTopicIds.length) return
     const categories = newsCategories(title, plain(rawSummary, 1800), client)
+    if (!categories.length && stream !== 'official') categories.push('related')
+    if (source.parser === 'minimax-notes' && !categories.includes('model')) categories.push('model')
     if (categories.length === 0) return
     const prerelease = client && /(?:alpha|beta|canary|nightly|preview|(?:^|[.-])rc)(?:[.\d-]|$)/i.test(title)
     if (client) {
@@ -57,7 +62,8 @@ export function parseNews(body: string, source: NewsSource, now = Date.now()): N
       title = `${NEWS_TOPICS.find(topic => topic.id === source.topicId)?.label ?? source.topicId} ${title}`
     }
     const id = createHash('sha256').update(url).digest('hex').slice(0, 24)
-    result.set(id, { id, sourceId: source.id, topicId: source.topicId, title, summary, url, publishedAt, categories, prerelease })
+    const topicId = stream === 'official' ? source.topicId : relatedTopicIds.find(id => NEWS_TOPICS.find(topic => topic.id === id)?.kind === 'tool') ?? relatedTopicIds[0]
+    result.set(id, { id, sourceId: source.id, topicId, relatedTopicIds, stream, title, summary, url, publishedAt, categories, prerelease })
   }
 
   if (source.parser === 'feed') {
@@ -93,6 +99,15 @@ export function parseNews(body: string, source: NewsSource, now = Date.now()): N
         const link = heading.closest('a[href]')
         const time = item.find('time').first()
         add(heading.text(), link.attr('href') ?? '', time.attr('datetime') ?? time.text(), link.find('p').first().text())
+      })
+    } else if (source.parser === 'minimax-notes') {
+      $('.mdx-content h4').each((_, element) => {
+        const heading = $(element)
+        const date = heading.text().replace(/[\u200b-\u200d\ufeff]/g, '').trim()
+        // Month-only entries have no exact publication date; do not invent a day.
+        if (!/\b\d{1,2},\s*\d{4}$/.test(date)) return
+        const card = heading.next()
+        add(card.find('h2').first().text(), `${source.website}#${heading.attr('id') ?? ''}`, date, card.find('[data-as="p"],p').first().text())
       })
     } else if (source.parser === 'deepseek') {
       let date = ''

@@ -46,8 +46,11 @@ import { redact } from '../util/redact'
 import { toCsv } from '../util/csv'
 import { NewsService } from '../news/service'
 import { suggestedNewsTopics } from '../news/catalog'
-import type { NewsPreferencesInput } from '../news/types'
+import type { NewsPreferencesInput, NewsStream } from '../news/types'
 import type { NewsFetch } from '../news/transport'
+import { RankingsService, type RankingsFetch } from '../rankings/service'
+import { defaultRankingsApiKey } from '../rankings/config'
+import type { RankingsSettingsInput } from '../rankings/types'
 
 export interface AppOptions {
   dataDir: string
@@ -58,6 +61,8 @@ export interface AppOptions {
   enableLocalLogs?: boolean
   startupTrace?: (stage: string, detail?: unknown) => void
   newsFetchImpl?: NewsFetch
+  rankingsFetchImpl?: RankingsFetch
+  rankingsSharedApiKey?: string
 }
 
 const PROVIDER_MAP = new Map(PROVIDERS.map((provider) => [provider.id, provider]))
@@ -79,6 +84,7 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
 
 export class TokenPanelApp {
   private news?: NewsService
+  private rankings?: RankingsService
   private refreshing?: Promise<RefreshAllResult>
   /** dedupeKey → 上次推送给 Webhook 的时间，只在本次进程内有效（告警不落库）。 */
   private readonly pushedAlerts = new Map<string, number>()
@@ -139,12 +145,24 @@ export class TokenPanelApp {
     return this.news ??= new NewsService(this.store.dataDir, this.options.newsFetchImpl)
   }
 
-  getNews(force = false) {
-    return this.getNewsService().get(suggestedNewsTopics(this.store.listAccounts(), this.settings.logSources), force)
+  getNews(force = false, stream: NewsStream = 'official', cachedOnly = false) {
+    return this.getNewsService().get(suggestedNewsTopics(this.store.listAccounts(), this.settings.logSources), force, stream, cachedOnly)
   }
 
   updateNewsPreferences(input: NewsPreferencesInput) {
     return this.getNewsService().update(input, suggestedNewsTopics(this.store.listAccounts(), this.settings.logSources))
+  }
+
+  private getRankingsService(): RankingsService {
+    return this.rankings ??= new RankingsService(this.store.dataDir, this.options.rankingsFetchImpl, Date.now, this.options.rankingsSharedApiKey ?? defaultRankingsApiKey())
+  }
+
+  getRankings(force = false, cachedOnly = false) {
+    return this.getRankingsService().get(force, cachedOnly)
+  }
+
+  configureRankings(input: RankingsSettingsInput) {
+    return this.getRankingsService().configure(input)
   }
 
   async saveAccount(input: AccountInput): Promise<AccountPublic> {

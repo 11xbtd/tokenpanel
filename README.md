@@ -1,10 +1,14 @@
 # TokenPanel
 
-AI Token 用量与余额 / 套餐额度看板。形态是 **uTools 插件 + 浏览器本地服务**，预制主流厂商配置，数据只存本机。
+AI Token 用量、余额 / 套餐额度、AI 动态与模型排行看板。形态是 **uTools 插件 + 浏览器本地服务**，预制主流厂商配置，数据只存本机。
 
 ![总览 · 按量](docs/overview-light.png)
 
 ![总览 · 订阅套餐](docs/plan-cards.png)
+
+![AI 动态](docs/news.png)
+
+![模型排行](docs/rankings.png)
 
 ## 它做什么
 
@@ -12,15 +16,17 @@ AI Token 用量与余额 / 套餐额度看板。形态是 **uTools 插件 + 浏�
 - **额度时间轴**：在总览集中展示已启用账户的窗口重置时间，支持未来 24 小时 / 7 天 / 全部范围；可展开窗口查看详情并直接刷新账户。到期窗口标注「待刷新」，未提供时间的窗口单独注明。仅在同一重置周期内有至少 3 次有效快照、跨度至少 10 分钟且余量下降至少 2 个百分点时，按近期节奏预估耗尽时间；过期、失败、旧数据或余量反弹后的样本不足时不预测。重置与「预估提前耗尽」使用不同标记，预测不改变实际余量或告警配置。
 - **钱只在两处出现**：卡片主数字位的**余额**，和明细里的**厂商实际计费**。消耗类数字一律按 token 展示；按 LiteLLM 价目估出来的金额继续入库但不在界面显示（明细里是 `—`，悬停说明原因），「预计可用天数」也只按实际计费的花费推算，全估算时不猜还能撑多久。订阅套餐（GLM Coding Plan、MiniMax Token / Coding Plan、Claude、ChatGPT/Codex 等）的 token 明细从本机客户端日志补，套餐金额不外推，绝不混进按量汇总。
 - **消耗监控**：按天、按账户、按模型拆解 token，支持缓存命中率、调用明细与 CSV 导出。**两个 Tab 的「token 走势」「模型排行」「本机日志源」是同一套组件**，只是数据分别取按量侧和套餐侧。Tab 与「统计范围」（**今日** / 近一周 / 近一月 / 近一年）合成一条**吸顶工具条**，滚动时不消失，改动同时作用于卡片与走势；选「今日」时走势自动改画当天 24 小时柱状。走势按模型堆叠（前 4 个各一条，其余合并成「其他 N 个模型」），点图例可隐藏单层。
+- **AI 动态**：分「官方动态 / 相关报道」两个流，关注 OpenAI、Anthropic、Google、DeepSeek、Kimi、MiniMax 等厂商和 Codex、Claude Code、Kimi Code、OpenCode 等工具；支持新模型 / 价格额度 / 客户端更新 / 周边动态分类、未读筛选、关键词搜索、时间范围和预览版开关。关注对象会按已添加账户与已启用日志源自动推荐；只读官方域名与量子位，缓存和已读状态存本机。
+- **模型排行**：接 Artificial Analysis 免费数据接口，集中比较智能指数、输出速度、首答等待、输入/输出价格与任务成本；支持按指标排序、厂商 / 已关注筛选、隐藏缺测和中文别名搜索。默认共享 Key 免配置，也可以填自己的 AA Key（AES-256-GCM 加密，只存本机）；榜单缓存 6 小时，失败保留上次成功数据。
 - **预制配置**：添加账户时自动填好 base_url、鉴权字段、接口路径与文档链接，并带各厂商官方标识（`@lobehub/icons-static-svg`，MIT，构建期内联成 data URI，离线可用；没有可靠来源的厂商回退首字母）；没有公开接口的厂商可手动录入余额/套餐，或导入 CSV。
-- **本地优先**：密钥 AES-256-GCM 加密，只存本机；无遥测；接口失败保留上次成功数据。
+- **本地优先**：账户密钥与 AA Key 都使用 AES-256-GCM 加密，只存本机；无遥测；接口失败保留上次成功数据。
 
 ### 明确不做
 
 - **不做代理/网关**：没有“把 base_url 指过来就自动记每次调用”的透传代理。uTools 插件没有后台常驻进程，做不了透明代理。
 - **不做云厂商 AK/SK 签名**：阿里云、火山、百度、腾讯的云账户余额需要各自签名算法，一期只提供手动录入 / 账单导入。
 - **不做透明代理**：没有“把 base_url 指过来就自动记每次调用”的透传代理。uTools 插件没有后台常驻进程，做不了透明代理；需要请求级 TTFT 的客户端只能后续在浏览器版加代理。
-- **不做全量客户端适配**：本机日志已适配 8 类主流客户端（见下），Cursor/Copilot 等只做“发现但未适配”提示；不是所有 49 种客户端日志都能一次覆盖。
+- **不做全量客户端适配**：本机日志已适配 11 类主流客户端（见下），Cursor/Copilot 等只做“发现但未适配”提示；不是所有 49 种客户端日志都能一次覆盖。
 - **不做多租户**：单人本地工具；浏览器版跨设备访问只有 HTTP Basic 一层保护。
 
 ## 快速开始
@@ -35,7 +41,7 @@ npm run start
 `start.cmd` 可以双击完成同样的事：首次自动安装依赖与构建，然后打开 `http://127.0.0.1:5188`。数据写在系统固定目录（Windows：`%APPDATA%\TokenPanel`），不在项目文件夹里，所以换机器、移动项目或重装都不会丢。启动成功会打印：
 
 ```
-TokenPanel 0.1.0 已启动：http://127.0.0.1:5188
+TokenPanel 1.0.0 已启动：http://127.0.0.1:5188
 数据目录：C:\Users\<你>\AppData\Roaming\TokenPanel
 ```
 
@@ -53,7 +59,7 @@ TokenPanel 0.1.0 已启动：http://127.0.0.1:5188
 
 1. `npm install && npm run build`，产物在 `dist/utools/`。
 2. 打开 uTools → **开发者工具** → **新建项目** → 选择 `dist/utools/plugin.json` → **接入开发**。
-3. 在 uTools 搜索框输入 `token`、`tokenpanel`、`AI余额` 或 `额度看板` 打开。
+3. 在 uTools 搜索框输入 `token`、`tokenpanel`、`AI余额`、`额度看板`、`AI动态` 或 `模型排行` 打开。
 4. 分发：`npm run pack:utools`，对方解压后在开发者工具里选择 `plugin.json`。上架 uTools 插件应用市场后可直接在 uTools 内安装；审核通过前，用开发者工具导入 `dist/utools/plugin.json`。
 
 插件默认单实例、窗口高度 760；宽度与是否可调由 uTools 控制。
@@ -166,6 +172,26 @@ OpenCode Console（按量余额）：按量付费的模型网关，余额要在�
 - **增量策略**：用量首次回补 14 天（最多 30 天），之后每次回补最近 2 天并去重；官方日账单的迟到更正在一期不回写（README 明确说明，避免误以为实时）。
 - **失败语义**：每个账户、每种能力（余额/套餐/用量）独立超时与独立失败；错误快照同步落库，卡片保留上次成功值并显示错误与时间。
 
+## AI 动态与模型排行
+
+### AI 动态
+
+- **来源限定**：只抓取目录里列出的官方域名、GitHub Releases 与量子位，不接受任意 URL；所有请求由本地服务或 uTools preload 发起，读不到登录态。
+- **关注推荐**：首次进入会按已添加账户和已启用日志源推荐关注对象；也可以手动管理关注列表。「官方动态 / 相关报道」两个流分开缓存与筛选。
+- **刷新与失败**：打开页面时按来源增量刷新；普通源缓存 1 小时，价格/规则监控页 6 小时。单个来源失败只影响该来源，页面保留上次条目并显示错误；不保存正文之外的账号数据。
+- **本地文件**：`news-preferences.json`（关注与已读）、`news-cache.json`（条目、来源状态与价格页基线）；不落对话内容。
+
+### 模型排行
+
+- **数据源**：Artificial Analysis 免费模型接口，指标包括智能指数、输出速度、首答等待、输入/输出价格与每任务成本；页面标注来源与评测方法链接。
+- **排序与筛选**：按能力、速度或成本排序，可切换全部指标；支持厂商筛选、只看已关注、隐藏缺测和中文别名搜索。
+- **Key 与缓存**：默认使用构建时注入的共享 AA Key；也可以在页面填自己的 AA Key，个人 Key 优先，使用 AES-256-GCM 加密保存在 `aa-settings.json`。请求只发往 `artificialanalysis.ai`，榜单缓存 6 小时，失败保留上次成功快照。
+- **口径**：智能指数与速度是 AA 的第三方评测/API 基准，不是本机客户端的实测速度；本机 Codex / Kimi Code 的 tok/s 仍在消耗分析里单独统计。
+
+### 构建期共享 Key
+
+源码仓库不包含真实 AA Key。构建时通过 `TOKENPANEL_AA_SHARED_API_KEY` 或 `TOKENPANEL_AA_KEY_DIR`（默认 `.dev/aa-owner-data`，已在 `.gitignore` 中）读取，只注入 Node 服务与 uTools preload，不进入浏览器渲染层。公开构建产物中的共享 Key 按设计可被提取，只用于降低上手门槛；对 Key 隔离有要求时请配置个人 Key。
+
 ## 金额与 token 口径
 
 - **界面上钱只有两处**：余额（厂商接口或手动记账），和「实际计费」列（官方账单 / 中转日志 / CSV 导入）。所有消耗数字一律按 token 展示。
@@ -203,6 +229,11 @@ OpenCode Console（按量余额）：按量付费的模型网关，余额要在�
 | `ledger.ndjson` | 手动记账（充值/消费/调整） |
 | `refresh-log.ndjson` | 刷新诊断日志（只记状态与脱敏错误） |
 | `log-file-cache.json` | 本机日志的文件指纹与最后扫描时间，用于增量导入 |
+| `news-preferences.json` | AI 动态的关注对象与已读 ID |
+| `news-cache.json` | AI 动态条目、来源状态与价格页监控基线 |
+| `aa-settings.json` | 个人 Artificial Analysis API Key（AES-256-GCM 密文） |
+| `aa-rankings-cache.json` | 模型排行榜快照（最多 5000 个模型） |
+| `aa-rankings-state.json` | 榜单同步时间、退避时间与脱敏错误状态 |
 | `backups/config-*.json` | 每次保存账户/设置自动留一份配置快照，保留最近 10 份 |
 | `prices-overrides.json` | 手写价目覆盖 |
 | `state.json` | 最近刷新时间与每账户同步状态 |
@@ -219,16 +250,18 @@ OpenCode Console（按量余额）：按量付费的模型网关，余额要在�
 | `TOKENPANEL_DATA_DIR` | `%APPDATA%\TokenPanel` | 数据目录（浏览器版与 uTools 共用） |
 | `TOKENPANEL_DEMO` | 空 | `1` 启用演示数据与模拟接口 |
 | `TOKENPANEL_OPEN` | 空 | `1` 启动后自动打开浏览器 |
+| `TOKENPANEL_AA_SHARED_API_KEY` | 空 | AA 共享 Key；构建时注入 Node 产物，也可在运行浏览器版时覆盖 |
+| `TOKENPANEL_AA_KEY_DIR` | `.dev/aa-owner-data` | 私有构建配置目录，存放加密的 AA 共享 Key；不要提交 |
 
 ## 安全边界
 
-- 账户密钥与 Webhook URL 使用 AES-256-GCM 加密落盘；界面只显示掩码尾号。
-- 「不含密钥」备份会移除账户凭证、Webhook 地址与自定义请求头；「含密钥」备份是**明文**，导出后请立即移到安全位置。
+- 账户密钥与 Webhook URL 使用 AES-256-GCM 加密落盘；界面只显示掩码尾号。个人 AA Key 使用同一机制加密保存在 `aa-settings.json`。
+- 「不含密钥」备份会移除账户凭证、Webhook 地址与自定义请求头；「含密钥」备份是**明文**，导出后请立即移到安全位置。备份不包含 AA 个人 Key。
 - 自定义 HTTP 的请求头请用 `{{apiKey}}` 占位；直接粘贴的密钥会以明文保存在 `config.json` 的 options 里。
 - 局域网访问必须设置 `TOKENPANEL_PASSWORD`（HTTP Basic）。如果要暴露到公网，请放在带 TLS 的反向代理后面，不要直接映射端口。
 - 加密只能防止「文件被随手拷走」，防不了本机恶意程序；不要把数据目录同步到公共网盘。
 - 本机日志源默认停用；启用后只读日志，只落模型/时间/token/缓存/耗时，不落对话内容。日志中的模型名用于归属套餐，可能包含项目/会话元数据，但不会写入 `usage.ndjson`。
-- 所有厂商请求都由本地服务或 uTools preload 发起，不经过任何第三方；没有遥测。
+- 所有厂商、AI 动态与 AA 榜单请求都由本地服务或 uTools preload 发起，不经过任何第三方；没有遥测。AA 共享 Key 只注入 Node 产物，不进入渲染层；公开构建中的共享 Key 可被提取，需要隔离时请配置个人 Key。
 
 ## 导入 / 导出
 
@@ -241,22 +274,24 @@ OpenCode Console（按量余额）：按量付费的模型网关，余额要在�
 
 ```bash
 npm run typecheck   # TypeScript 7
-npm run test        # Vitest：130 项（14 个测试文件）
+npm run test        # Vitest：171 项（17 个测试文件）
 npm run build       # web + server + preload + uTools 产物
 npm run pack:utools # zip
 ```
 
-测试覆盖：价目匹配与阶梯价、人民币覆盖、CSV 解析与日期归日、密钥加密与掩码、并发写 state.json、用量去重、记账负调整、带密钥备份迁移、Webhook 加密与安全备份脱敏、日志源多账户绑定与旧单绑定折叠、厂商图标覆盖与 SVG 完整性、各厂商余额/套餐/用量解析、401/超时错误、单账户失败隔离、告警不落库（磁盘无告警文件、每次进入现算）、preload `window.services` 端到端；Kimi Code/Kimi CLI/Claude Code/Codex/Gemini/Qwen/Cline/OpenCode/Qoder/ZCode/DeepSeek Harness 日志解析（含 DSH 由 step 时间戳推首字与 tok/s）、增量缓存、未归属不入库与重绑后重扫补齐、模型归属规则、按量/套餐分离与按量 token 指标、窗口行按周期固定排序、估算金额只进 `costUsd` 不进 `actualUsd`、区间裁剪走势与按量按模型拆线、Codex 逐请求估速与「估算升级为精确值」的合并规则。
+测试覆盖：价目匹配与阶梯价、人民币覆盖、CSV 解析与日期归日、密钥加密与掩码、并发写 state.json、用量去重、记账负调整、带密钥备份迁移、Webhook 加密与安全备份脱敏、日志源多账户绑定与旧单绑定折叠、厂商图标覆盖与 SVG 完整性、各厂商余额/套餐/用量解析、401/超时错误、单账户失败隔离、告警不落库（磁盘无告警文件、每次进入现算）、preload `window.services` 端到端；Kimi Code/Kimi CLI/Claude Code/Codex/Gemini/Qwen/Cline/OpenCode/Qoder/ZCode/DeepSeek Harness 日志解析（含 DSH 由 step 时间戳推首字与 tok/s）、增量缓存、未归属不入库与重绑后重扫补齐、模型归属规则、按量/套餐分离与按量 token 指标、窗口行按周期固定排序、估算金额只进 `costUsd` 不进 `actualUsd`、区间裁剪走势与按量按模型拆线、Codex 逐请求估速与「估算升级为精确值」的合并规则；AI 动态的来源域名/解析/去重/关注推荐/缓存与失败恢复、价格页监控基线、媒体流隔离；AA 榜单分页/压缩/大小限制/缓存原子发布/429 退避/Key 不进渲染层/错误快照保留。
 
 目录：
 
 ```
 src/core/       共享核心：类型、厂商注册表、适配器、存储、计价、聚合、告警
 src/core/logs/  本机日志适配器、增量扫描、模型归属规则
+src/core/news/  AI 动态来源目录、解析、监控、缓存与关注
+src/core/rankings/ AA 榜单同步、分页、缓存、Key 管理与错误退避
 src/node/       本地服务、uTools preload、演示数据
-src/renderer/   React 界面（总览 / 消耗 / 明细 / 账户 / 设置）；lib/brands.ts 为生成的厂商图标数据
+src/renderer/   React 界面（总览 / 消耗 / 明细 / AI 动态 / 模型排行 / 账户 / 设置）；lib/brands.ts 为生成的厂商图标数据
 scripts/        价目快照、厂商图标、构建、打包、演示与启动
-tests/          适配器、存储、导入、计价、日志、集成、preload
+tests/          适配器、存储、导入、计价、日志、动态、榜单、集成、preload
 dist/           web / server / utools 构建产物
 docs/           README 截图
 ```
@@ -274,17 +309,13 @@ docs/           README 截图
 9. 当前适配 11 类客户端；Cursor/Copilot 等只做目录发现并标「未适配」，Codex `.zst` 会话跳过；Qoder/ZCode 需要 Node 22+、DeepSeek Harness 需要 Node 22.15+（uTools 插件内置 Node 20 读不了）。
 10. 更改日志源的归属规则（含自动补绑的默认账户）会清空该来源已导入记录并重新扫描；日志格式变更时适配器可能需要更新。
 11. 套餐的月额度百分比仍然取决于厂商接口是否返回月池；本机日志能给「本月 token 用量」，不能凭空还原「月额度%」。
+12. AI 动态只覆盖目录里列出的官方来源与量子位；厂商改版或反爬会解析失败，页面保留上次条目并标出来源错误，不会用旧内容冒充新数据。
+13. 模型排行依赖 Artificial Analysis 的免费接口和共享 Key 额度；共享额度用尽时需要配置个人 Key。榜单是第三方评测，不是本机模型实测；AA 改字段或收紧权限时可能暂时不可用，失败会保留上次快照。
+14. AI 动态和模型排行都需要联网，且 uTools 没有后台常驻：不开面板不会在后台刷新或提醒。
 
 ## 参与贡献
 
-欢迎提交 Issue 和 Pull Request。改动前建议先跑：
-
-```bash
-npm run typecheck
-npm run test
-```
-
-涉及厂商接口或客户端日志格式的改动，请附上**脱敏后**的响应/日志样例；不要提交真实 API Key、Access Token、Cookie 或包含对话内容的原始日志。新增厂商预设时，同时更新 `src/core/providers/registry.ts`、对应适配器与测试。安全相关问题请先私下联系维护者，不要直接公开可利用细节。
+开发环境、提交前检查与适配器约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。安全相关问题请按 [SECURITY.md](SECURITY.md) 私密报告，不要在公开 Issue 里贴真实 Key、Cookie 或未脱敏日志。
 
 ## 许可证与致谢
 

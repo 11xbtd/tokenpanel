@@ -10,6 +10,7 @@ import {
   Settings as SettingsIcon,
   Sun,
   Table2,
+  Trophy,
   Wallet,
 } from 'lucide-react'
 import type { AccountPublic, Bootstrap, Overview as OverviewData } from '../core/types'
@@ -29,12 +30,14 @@ import { RecordsPage } from './pages/Records'
 import { AccountsPage } from './pages/Accounts'
 import { SettingsPage } from './pages/Settings'
 import { NewsPage } from './pages/News'
+import { RankingsPage } from './pages/Rankings'
 
 const NAV: Array<{ id: Page; label: string; icon: typeof LayoutDashboard }> = [
   { id: 'overview', label: '总览', icon: LayoutDashboard },
   { id: 'usage', label: '消耗分析', icon: BarChart3 },
   { id: 'records', label: '调用明细', icon: Table2 },
   { id: 'news', label: 'AI 动态', icon: Newspaper },
+  { id: 'rankings', label: '模型排行', icon: Trophy },
   { id: 'accounts', label: '账户', icon: Wallet },
   { id: 'settings', label: '设置', icon: SettingsIcon },
 ]
@@ -44,6 +47,7 @@ const PAGE_META: Record<Page, { title: string; subtitle: string }> = {
   usage: { title: '消耗分析', subtitle: '按天、账户、模型拆 token，金额只列实际账单' },
   records: { title: '调用明细', subtitle: '逐笔用量记录，可筛选与导出' },
   news: { title: 'AI 动态', subtitle: '关注厂商与工具的新模型、价格额度和客户端更新' },
+  rankings: { title: '模型排行', subtitle: 'Artificial Analysis · 智能指数、速度与 API 价格' },
   accounts: { title: '账户', subtitle: '厂商接口、订阅套餐、中转站与手动录入' },
   settings: { title: '设置', subtitle: '汇率、告警、价目与数据导入导出' },
 }
@@ -326,14 +330,14 @@ export function App() {
                 <div className="mt-1 hidden truncate text-[10.5px] muted sm:block">{meta.subtitle}</div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {page !== 'news' ? <><span className="hidden text-[11px] muted lg:inline">
+                {page !== 'news' && page !== 'rankings' ? <><span className="hidden text-[11px] muted lg:inline">
                   {lastRefreshAt ? `上次刷新 ${formatDateTime(lastRefreshAt)}` : '尚未刷新'}
                 </span>
                 <button type="button" className="btn btn-sm" onClick={() => void refreshAll(true)} disabled={refreshing}>
                   {refreshing ? <Spinner size={13} /> : <RefreshCw size={13} />}
                   {refreshing ? '刷新中' : '全部刷新'}
                 </button>
-                <button type="button" className="btn btn-primary btn-sm hidden sm:inline-flex" onClick={() => setModal({ open: true })}><Plus size={13} />添加账户</button></> : <span className="hidden items-center gap-1.5 text-[11px] muted sm:flex"><Newspaper size={13} />你的 AI 更新简报</span>}
+                <button type="button" className="btn btn-primary btn-sm hidden sm:inline-flex" onClick={() => setModal({ open: true })}><Plus size={13} />添加账户</button></> : <span className="hidden items-center gap-1.5 text-[11px] muted sm:flex">{page === 'rankings' ? <><Trophy size={13} />独立模型评测</> : <><Newspaper size={13} />你的 AI 更新简报</>}</span>}
                 <button type="button" className="btn btn-ghost h-8 w-8 p-0 md:hidden" aria-label={dark ? '切换浅色模式' : '切换深色模式'} onClick={() => void toggleTheme()}>
                   {dark ? <Sun size={16} /> : <Moon size={16} />}
                 </button>
@@ -358,7 +362,7 @@ export function App() {
                     style={active ? { background: 'var(--accent-soft)', color: 'var(--accent-strong)', fontWeight: 600 } : { color: 'var(--text-muted)' }}
                   >
                     <Icon size={14} />
-                    {item.label}
+                    <span className="min-w-0 truncate">{item.label}</span>
                   </button>
                 )
               })}
@@ -369,6 +373,7 @@ export function App() {
               {page === 'usage' ? <UsagePage /> : null}
               {page === 'records' ? <RecordsPage /> : null}
               {page === 'news' ? <NewsPage /> : null}
+              {page === 'rankings' ? <RankingsPage /> : null}
               {page === 'accounts' ? <AccountsPage /> : null}
               {page === 'settings' ? <SettingsPage /> : null}
             </main>

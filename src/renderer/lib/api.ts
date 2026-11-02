@@ -64,8 +64,10 @@ const httpServices: PanelServices = {
   scanLogs: () => request('/api/logs/scan', { method: 'POST' }),
   rebuildLogStats: () => request('/api/logs/rebuild', { method: 'POST' }),
   getOverview: (days) => request(`/api/overview${query({ days })}`),
-  getNews: (force) => request(`/api/news${force ? '?force=1' : ''}`),
+  getNews: (force, stream, cachedOnly) => request(`/api/news${query({ force: force ? 1 : undefined, stream, cached: cachedOnly ? 1 : undefined })}`),
   updateNewsPreferences: (input) => request('/api/news/preferences', { method: 'POST', body: JSON.stringify(input) }),
+  getRankings: (force, cachedOnly) => request(`/api/rankings${query({ force: force ? 1 : undefined, cached: cachedOnly ? 1 : undefined })}`),
+  configureRankings: (input) => request('/api/rankings/settings', { method: 'POST', body: JSON.stringify(input) }),
   getRecords: (filters) =>
     request(
       `/api/usage${query({

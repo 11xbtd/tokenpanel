@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react'
 import type { AccountPublic, Bootstrap, Overview } from '../../core/types'
 
-export type Page = 'overview' | 'usage' | 'records' | 'news' | 'accounts' | 'settings'
+export type Page = 'overview' | 'usage' | 'records' | 'news' | 'rankings' | 'accounts' | 'settings'
 
 export interface AppContextValue {
   bootstrap: Bootstrap

@@ -1,4 +1,5 @@
 const SECRET_PATTERNS: RegExp[] = [
+  /aa_[A-Za-z0-9_-]{8,}/g,
   /sk-[A-Za-z0-9_-]{8,}/g,
   /sk-ant-[A-Za-z0-9_-]{8,}/g,
   /sk-or-v1-[A-Za-z0-9_-]{8,}/g,

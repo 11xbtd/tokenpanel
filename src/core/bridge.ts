@@ -15,7 +15,8 @@ import type {
   WebhookTestResult,
 } from './types'
 import type { PriceOverridesFile } from './pricing/types'
-import type { NewsOverview, NewsPreferencesInput } from './news/types'
+import type { NewsOverview, NewsPreferencesInput, NewsStream } from './news/types'
+import type { RankingsOverview, RankingsSettingsInput } from './rankings/types'
 
 export interface SaveFileResult {
   saved: boolean
@@ -33,8 +34,10 @@ export interface PanelServices {
   scanLogs(): Promise<LogScanResult>
   rebuildLogStats(): Promise<LogScanResult & { rebuilt: number }>
   getOverview(days: number): Promise<Overview>
-  getNews(force?: boolean): Promise<NewsOverview>
+  getNews(force?: boolean, stream?: NewsStream, cachedOnly?: boolean): Promise<NewsOverview>
   updateNewsPreferences(input: NewsPreferencesInput): Promise<NewsOverview>
+  getRankings(force?: boolean, cachedOnly?: boolean): Promise<RankingsOverview>
+  configureRankings(input: RankingsSettingsInput): Promise<RankingsOverview>
   getRecords(query: RecordsQuery): Promise<RecordsPage>
   addLedger(entry: Omit<LedgerEntry, 'id'>): Promise<LedgerEntry>
   listLedger(accountId?: string): Promise<LedgerEntry[]>

@@ -13,7 +13,8 @@ import { VERSION } from '../core/storage/defaults'
 import { defaultDataDir, legacyDataDirs } from '../core/paths'
 import { migrateLegacyData } from '../core/storage/migrate'
 import { createDemoFetch, seedDemo } from './demo'
-import type { NewsPreferencesInput } from '../core/news/types'
+import type { NewsPreferencesInput, NewsStream } from '../core/news/types'
+import type { RankingsSettingsInput } from '../core/rankings/types'
 
 const dataDir = defaultDataDir()
 const migratedFrom = await migrateLegacyData(dataDir, legacyDataDirs())
@@ -102,9 +103,13 @@ app.get('/api/health', (c) => c.json({ ok: true, version: VERSION, demo }))
 
 app.get('/api/bootstrap', async (c) => c.json(await service.getBootstrap()))
 
-app.get('/api/news', async (c) => c.json(await service.getNews(c.req.query('force') === '1')))
+app.get('/api/news', async (c) => c.json(await service.getNews(c.req.query('force') === '1', (c.req.query('stream') ?? 'official') as NewsStream, c.req.query('cached') === '1')))
 
 app.post('/api/news/preferences', async (c) => c.json(await service.updateNewsPreferences(await readJson<NewsPreferencesInput>(c))))
+
+app.get('/api/rankings', async (c) => c.json(await service.getRankings(c.req.query('force') === '1', c.req.query('cached') === '1')))
+
+app.post('/api/rankings/settings', async (c) => c.json(await service.configureRankings(await readJson<RankingsSettingsInput>(c))))
 
 app.post('/api/accounts', async (c) => c.json(await service.saveAccount(await readJson(c))))
 

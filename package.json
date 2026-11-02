@@ -1,6 +1,6 @@
 {
   "name": "token-panel",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "AI Token 用量与余额/套餐额度看板（uTools 插件 + 浏览器版）",
@@ -8,7 +8,7 @@
   "author": "TokenPanel contributors",
   "scripts": {
     "dev": "concurrently -k -n api,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:web\"",
-    "dev:server": "esbuild src/node/server.ts --bundle --platform=node --target=node20 --format=esm --outfile=.dev/server.mjs --sourcemap --loader:.json=json && node .dev/server.mjs",
+    "dev:server": "node scripts/dev-server.mjs",
     "dev:web": "vite",
     "build": "npm run build:prices && npm run build:brands && vite build && node scripts/build-node.mjs",
     "build:prices": "node scripts/build-prices.mjs",
