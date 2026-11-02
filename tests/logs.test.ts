@@ -673,6 +673,41 @@ describe('DeepSeek Harness 与 OpenCode 适配器', () => {
     expect(records[1].tokensPerSecond).toBeUndefined()
   })
 
+  it('DSH：uTools 的 Node 20 用 fzstd 回退解码多帧日志', async () => {
+    const zlib = await import('node:zlib')
+    const compressed = (zlib as any).zstdCompressSync
+    if (typeof compressed !== 'function') return
+    const rows = [
+      { type: 'model/selection', seq: 1, time: 1_700_000_001_000, data: { provider: 'deepseek-official', model: 'deepseek-v4-pro' } },
+      { type: 'step/start', seq: 2, time: 1_700_000_001_500, data: { turn: 1, step: 1 } },
+      { type: 'assistant/chunk', seq: 3, time: 1_700_000_001_600, data: { turn: 1, step: 1, chunk: { content: 'x' } } },
+      {
+        type: 'assistant/message',
+        seq: 4,
+        time: 1_700_000_002_000,
+        data: { turn: 1, step: 1, usage: { inputTokens: 1000, outputTokens: 200, cacheReadTokens: 500, reasoningTokens: 50 } },
+      },
+    ]
+    const frames = rows.map((row) => compressed(Buffer.from(`${JSON.stringify(row)}\n`, 'utf8')))
+    const sessionPath = path.join(dir, 'dsh-fallback', 'sessions', 'proj', 'session-fb', 'session.jsonl.zstd')
+    await fs.mkdir(path.dirname(sessionPath), { recursive: true })
+    await fs.writeFile(sessionPath, Buffer.concat(frames))
+
+    const adapter = createDshAdapter(path.join(dir, 'dsh-fallback'), { forceFallback: true })
+    const files = await adapter.listFiles()
+    expect(files).toHaveLength(1)
+    const records = await adapter.parseFile(files[0])
+    expect(records).toHaveLength(1)
+    expect(records[0]).toMatchObject({
+      model: 'deepseek-v4-pro',
+      inputTokens: 1000,
+      outputTokens: 200,
+      cacheReadTokens: 500,
+      reasoningTokens: 50,
+      ttftMs: 100,
+    })
+  })
+
   it('OpenCode：SQLite 版从 message.data 取用量与模型', async () => {
     const { DatabaseSync } = await import('node:sqlite')
     const root = path.join(dir, 'opencode')

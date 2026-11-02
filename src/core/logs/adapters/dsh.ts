@@ -1,8 +1,14 @@
 import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { decompress as decompressFzstd } from 'fzstd'
 import type { LogFileStat, LogRecord, LogSourceAdapter } from '../types'
 import { displayPath, exists, listFiles, statFile } from '../util'
+
+export interface DshAdapterOptions {
+  /** 测试或排查时强制走纯 JS 解码，模拟 uTools 的 Node 20。 */
+  forceFallback?: boolean
+}
 
 function resolveRoot(override?: string): string {
   if (override) return override
@@ -12,6 +18,8 @@ function resolveRoot(override?: string): string {
 
 /** zstd 帧魔数（小端 0xFD2FB528）。会话文件是多个 zstd 帧拼接，逐帧解开。 */
 const ZSTD_MAGIC = 0xfd2fb528
+/** 增量扫描时向前回溯的字节数；DSH 每个事件一帧，1MB 足够覆盖上次末尾的半个帧。 */
+const RESUME_LOOKBACK = 1024 * 1024
 
 function frameOffsets(buffer: Buffer): number[] {
   const offsets: number[] = []
@@ -34,9 +42,11 @@ interface DshRow {
  * 每行 assistant/message 带这次调用的 usage，model/selection 行给出当前用的模型。
  * 只读 usage 与模型名，不读对话内容。
  */
-export function createDshAdapter(homeOverride?: string): LogSourceAdapter {
+export function createDshAdapter(homeOverride?: string, options: DshAdapterOptions = {}): LogSourceAdapter {
   const root = resolveRoot(homeOverride)
   const sessionsDir = path.join(root, 'sessions')
+  /** 同一进程内按文件记住已解析到的大小，追加日志只从末尾附近续解，避免每次重扫整个大文件。 */
+  const parsedSizes = new Map<string, number>()
 
   return {
     id: 'dsh',
@@ -45,16 +55,10 @@ export function createDshAdapter(homeOverride?: string): LogSourceAdapter {
     capabilities: { tokens: true, cache: true, speed: true, ttft: true },
     async detect() {
       const available = await exists(sessionsDir)
-      const zlib = await import('node:zlib')
-      const zstdReady = typeof (zlib as any).zstdDecompressSync === 'function'
       return {
         available,
         paths: [displayPath(root)],
-        note: !available
-          ? '未找到 ~/.dsh/sessions；安装并跑过 DeepSeek Harness 后会自动出现。'
-          : zstdReady
-            ? undefined
-            : '需要 Node 22.15+ 的 zstd 支持（浏览器版可用，uTools 插件内置 Node 20 读不了）。',
+        note: available ? undefined : '未找到 ~/.dsh/sessions；安装并跑过 DeepSeek Harness 后会自动出现。',
       }
     },
     async listFiles(): Promise<LogFileStat[]> {
@@ -75,23 +79,48 @@ export function createDshAdapter(homeOverride?: string): LogSourceAdapter {
     },
     async parseFile(file: LogFileStat): Promise<LogRecord[]> {
       const zlib = await import('node:zlib')
-      const decompress = (zlib as any).zstdDecompressSync
-      if (typeof decompress !== 'function') {
-        throw new Error('DeepSeek Harness 日志需要 Node 22.15+ 的 zstd 解压（浏览器版可用，uTools 插件内置 Node 20 读不了）')
-      }
+      const nativeDecompress = options.forceFallback ? undefined : (zlib as any).zstdDecompressSync
       const raw = await fs.readFile(file.path)
       const records: LogRecord[] = []
       /** turn:step → 该步的 step/start 与首个 assistant/chunk 时间，用来算首字与速度。 */
       const steps = new Map<string, { start?: number; firstChunk?: number }>()
       let model = 'deepseek-harness'
       let provider: string | undefined
-      for (const offset of frameOffsets(raw)) {
-        let text: string
-        try {
-          text = decompress(raw.subarray(offset)).toString('utf8')
-        } catch {
-          continue
+      const decode = (from: number): string[] => {
+        const chunk = from > 0 ? raw.subarray(from) : raw
+        const decoded: string[] = []
+        if (typeof nativeDecompress === 'function') {
+          for (const offset of frameOffsets(chunk)) {
+            try {
+              decoded.push(nativeDecompress(chunk.subarray(offset)).toString('utf8'))
+            } catch {
+              continue
+            }
+          }
+        } else {
+          try {
+            decoded.push(Buffer.from(decompressFzstd(chunk)).toString('utf8'))
+          } catch {
+            throw new Error('DeepSeek Harness 日志解压失败，文件可能不完整')
+          }
         }
+        return decoded
+      }
+      const previousSize = parsedSizes.get(file.path)
+      let resumeFrom = 0
+      if (previousSize && raw.length > previousSize) {
+        const from = Math.max(0, previousSize - RESUME_LOOKBACK)
+        for (let i = previousSize - 4; i >= from; i--) {
+          if (raw.readUInt32LE(i) === ZSTD_MAGIC) {
+            resumeFrom = i
+            break
+          }
+        }
+      }
+      let texts = decode(resumeFrom)
+      // 回溯点落在压缩数据里的伪魔数时，退回全量解析，宁可慢也不漏。
+      if (texts.length === 0 && resumeFrom > 0) texts = decode(0)
+      for (const text of texts) {
         for (const line of text.split('\n')) {
           if (!line.trim()) continue
           let row: DshRow
@@ -159,6 +188,7 @@ export function createDshAdapter(homeOverride?: string): LogSourceAdapter {
           })
         }
       }
+      parsedSizes.set(file.path, raw.length)
       return records
     },
   }

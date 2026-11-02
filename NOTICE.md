@@ -85,6 +85,18 @@ Balance/usage endpoint lists and dashboard patterns were cross-checked against
 CodexBar, api-monitor, tokscale and token-monitor (see README links). Their
 licenses apply to their own code; none is bundled here.
 
+### fzstd
+
+`fzstd` is used as a pure-JavaScript Zstandard fallback so DeepSeek Harness
+logs can be read in uTools' Node 20 runtime.
+
+<https://github.com/101arrowz/fzstd> (MIT)
+
+Copyright (c) 2020 Arjun Barrett.
+
+Licensed under the MIT License; the permission notice in `LICENSE` applies to
+this component as well.
+
 ## App icon
 
 `logo.png` (the TokenPanel plugin icon itself) was generated for this project

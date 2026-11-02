@@ -2,7 +2,7 @@ import type { AccountOptions, QuotaSnapshot, Settings } from '../types'
 import { DEFAULT_QUOTA_COLORS } from '../util/quota'
 
 export const SCHEMA_VERSION = 1
-export const VERSION = '1.1.0'
+export const VERSION = '1.1.1'
 
 export interface StoredAccount {
   id: string

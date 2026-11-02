@@ -47,7 +47,7 @@ npm run start
 `start.cmd` 可以双击完成同样的事：首次自动安装依赖与构建，然后打开 `http://127.0.0.1:5188`。数据写在系统固定目录（Windows：`%APPDATA%\TokenPanel`），不在项目文件夹里，所以换机器、移动项目或重装都不会丢。启动成功会打印：
 
 ```
-TokenPanel 1.1.0 已启动：http://127.0.0.1:5188
+TokenPanel 1.1.1 已启动：http://127.0.0.1:5188
 数据目录：C:\Users\<你>\AppData\Roaming\TokenPanel
 ```
 
@@ -130,7 +130,7 @@ TokenPanel 1.1.0 已启动：http://127.0.0.1:5188
 | OpenCode | 有 | 有（created→completed） | 未确认 | `%USERPROFILE%\.local\share\opencode\opencode.db`（SQLite，新版）或 `storage\message\**`（旧版） |
 | Qoder | 有（`local.db` 的 `token_info`） | 无 | 无 | `%USERPROFILE%\.qoder\shared_client\cache\db\local.db`（SQLite，缓存最近消息） |
 | ZCode | 有 | 有（回合耗时） | **有**（`time_to_first_token_ms`） | `%USERPROFILE%\.zcode\cli\db\db.sqlite`（SQLite） |
-| DeepSeek Harness | 有 | 有（首包→message 的流式时长） | **有**（`step/start`→首个 `assistant/chunk`） | `%USERPROFILE%\.dsh\sessions\**\session.jsonl.zstd`（zstd 帧，需 Node 22.15+） |
+| DeepSeek Harness | 有 | 有（首包→message 的流式时长） | **有**（`step/start`→首个 `assistant/chunk`） | `%USERPROFILE%\.dsh\sessions\**\session.jsonl.zstd`（zstd 帧；Node 22+ 用原生解压，Node 20 用内置纯 JS 回退，首次大文件会慢一些） |
 
 - **首次只登记，不自动读取**：日志源被发现后默认停用，在「设置 → 本机日志源」或套餐 Tab 点「启用」后才开始增量扫描。
 - **归属可以配多条**：一个日志源能绑多个套餐账户，每条规则 = 账户 + 可选模型正则。解析顺序：带模型正则的绑定 → 日志自带的厂商线索（ZCode 的 `provider_id`，比模型名硬）→ 模型名自动规则（`kimi`、`glm`、`minimax`、`deepseek` 这类名字自带厂商的）→ 不带正则的默认绑定。
@@ -282,7 +282,7 @@ OpenCode Console（按量余额）：按量付费的模型网关，余额要在�
 
 ```bash
 npm run typecheck   # TypeScript 7
-npm run test        # Vitest：171 项（17 个测试文件）
+npm run test        # Vitest：172 项（17 个测试文件）
 npm run build       # web + server + preload + uTools 产物
 npm run pack:utools # zip
 ```
@@ -314,7 +314,7 @@ docs/           README 截图
 6. 浏览器版是单用户 + Basic Auth，没有会话管理、CSRF 防护、限流；仅建议本机或可信局域网使用。
 7. 中转站日志单次最多拉 20 页 × 100 条（约 2000 条），首次同步取最近 14 天；超过上限时更早的记录不会自动补齐，重度中转站建议用 CSV 导入。
 8. 首字仅从明确字段或可验证的首包时间获取；新版 Codex 的 `task_complete.time_to_first_token_ms` 可用，缺失时显示 `—`。Codex/Claude 的速度包含思考或工具等待，界面标注「估速」，不能当作纯解码速度。
-9. 当前适配 11 类客户端；Cursor/Copilot 等只做目录发现并标「未适配」，Codex `.zst` 会话跳过；Qoder/ZCode 需要 Node 22+、DeepSeek Harness 需要 Node 22.15+（uTools 插件内置 Node 20 读不了）。
+9. 当前适配 11 类客户端；Cursor/Copilot 等只做目录发现并标「未适配」，Codex `.zst` 会话跳过；Qoder/ZCode 需要 Node 22+。DeepSeek Harness 在 Node 20 下使用纯 JS 的 zstd 回退，首次解析大日志会慢一些，后续增量扫描只读追加部分。
 10. 更改日志源的归属规则（含自动补绑的默认账户）会清空该来源已导入记录并重新扫描；日志格式变更时适配器可能需要更新。
 11. 套餐的月额度百分比仍然取决于厂商接口是否返回月池；本机日志能给「本月 token 用量」，不能凭空还原「月额度%」。
 12. AI 动态只覆盖目录里列出的官方来源与量子位；厂商改版或反爬会解析失败，页面保留上次条目并标出来源错误，不会用旧内容冒充新数据。

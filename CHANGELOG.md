@@ -2,6 +2,14 @@
 
 本项目的重要变更记录在这里。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## 1.1.1 - 2026-11-02
+
+### Fixed
+
+- 修复 DeepSeek Harness 会话日志在 uTools 内置 Node 20 下无法解压 `.jsonl.zstd`、导致 usage 统计不到的问题；新增 `fzstd` 纯 JS 回退，Node 22+ 仍优先使用原生 zstd。
+- DSH 日志追加后从文件末尾附近增量解析，避免每次刷新都重扫整个大文件；首次解析大日志仍可能慢一些。
+- 同步 uTools 插件与浏览器版版本号为 1.1.1。
+
 ## 1.1.0 - 2026-11-02
 
 ### Changed
