@@ -2,6 +2,14 @@
 
 本项目的重要变更记录在这里。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## 1.1.2 - 2026-11-02
+
+### Changed
+
+- DeepSeek Harness 的 zstd 解码从纯 JS `fzstd` 换成 WASM `zstddec`：本机 17.8 MB 会话日志从约 37 秒降到约 0.4 秒，uTools 的 Node 20 也能用。
+- 点击「重建」或修改日志归属规则时会清空 DSH 的增量解析位置，确保从文件头完整重扫。
+- 同步 uTools 插件与浏览器版版本号为 1.1.2。
+
 ## 1.1.1 - 2026-11-02
 
 ### Fixed

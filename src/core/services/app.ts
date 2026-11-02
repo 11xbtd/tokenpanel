@@ -186,9 +186,20 @@ export class TokenPanelApp {
 
   /** 归属变化后，该来源的历史记录整体重扫，避免同一调用被计两次。 */
   private async purgeReboundSources(sources: LogSourceSetting[]): Promise<void> {
+    const ids: string[] = []
     for (const source of sources) {
       await this.store.removeUsageByClient(source.id)
       await resetLogSourceCache(this.store.dataDir, source.id)
+      ids.push(source.id)
+    }
+    this.resetAdapterState(ids)
+  }
+
+  /** 清掉适配器内部缓存（如 DSH 的增量解析位置），确保重建时从文件头完整重读。 */
+  private resetAdapterState(ids: Iterable<string>): void {
+    const wanted = new Set(ids)
+    for (const adapter of this.logAdapters) {
+      if (wanted.has(adapter.id)) adapter.reset?.()
     }
   }
 
@@ -296,6 +307,7 @@ export class TokenPanelApp {
       rebuilt += await this.store.removeUsageByClient(id)
       await resetLogSourceCache(this.store.dataDir, id)
     }
+    this.resetAdapterState(enabled)
     const result = await this.scanLogs()
     return { ...result, rebuilt }
   }

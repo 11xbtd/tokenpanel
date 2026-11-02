@@ -1,14 +1,9 @@
 import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { decompress as decompressFzstd } from 'fzstd'
+import { ZSTDDecoder } from 'zstddec/stream'
 import type { LogFileStat, LogRecord, LogSourceAdapter } from '../types'
 import { displayPath, exists, listFiles, statFile } from '../util'
-
-export interface DshAdapterOptions {
-  /** 测试或排查时强制走纯 JS 解码，模拟 uTools 的 Node 20。 */
-  forceFallback?: boolean
-}
 
 function resolveRoot(override?: string): string {
   if (override) return override
@@ -20,14 +15,6 @@ function resolveRoot(override?: string): string {
 const ZSTD_MAGIC = 0xfd2fb528
 /** 增量扫描时向前回溯的字节数；DSH 每个事件一帧，1MB 足够覆盖上次末尾的半个帧。 */
 const RESUME_LOOKBACK = 1024 * 1024
-
-function frameOffsets(buffer: Buffer): number[] {
-  const offsets: number[] = []
-  for (let i = 0; i + 4 <= buffer.length; i++) {
-    if (buffer.readUInt32LE(i) === ZSTD_MAGIC) offsets.push(i)
-  }
-  return offsets
-}
 
 interface DshRow {
   type?: string
@@ -42,17 +29,23 @@ interface DshRow {
  * 每行 assistant/message 带这次调用的 usage，model/selection 行给出当前用的模型。
  * 只读 usage 与模型名，不读对话内容。
  */
-export function createDshAdapter(homeOverride?: string, options: DshAdapterOptions = {}): LogSourceAdapter {
+export function createDshAdapter(homeOverride?: string): LogSourceAdapter {
   const root = resolveRoot(homeOverride)
   const sessionsDir = path.join(root, 'sessions')
   /** 同一进程内按文件记住已解析到的大小，追加日志只从末尾附近续解，避免每次重扫整个大文件。 */
   const parsedSizes = new Map<string, number>()
+  const decoder = new ZSTDDecoder()
+  let decoderReady: Promise<void> | undefined
+  const ensureDecoder = () => (decoderReady ??= decoder.init())
 
   return {
     id: 'dsh',
     name: 'DeepSeek Harness',
     description: '读取 DeepSeek Harness 的 zstd 会话日志，取每次调用的 token 用量、模型，以及由 step/start→首包→message 时间戳算出的首字延迟与输出速度。',
     capabilities: { tokens: true, cache: true, speed: true, ttft: true },
+    reset() {
+      parsedSizes.clear()
+    },
     async detect() {
       const available = await exists(sessionsDir)
       return {
@@ -78,34 +71,13 @@ export function createDshAdapter(homeOverride?: string, options: DshAdapterOptio
       return stats
     },
     async parseFile(file: LogFileStat): Promise<LogRecord[]> {
-      const zlib = await import('node:zlib')
-      const nativeDecompress = options.forceFallback ? undefined : (zlib as any).zstdDecompressSync
+      await ensureDecoder()
       const raw = await fs.readFile(file.path)
       const records: LogRecord[] = []
       /** turn:step → 该步的 step/start 与首个 assistant/chunk 时间，用来算首字与速度。 */
       const steps = new Map<string, { start?: number; firstChunk?: number }>()
       let model = 'deepseek-harness'
       let provider: string | undefined
-      const decode = (from: number): string[] => {
-        const chunk = from > 0 ? raw.subarray(from) : raw
-        const decoded: string[] = []
-        if (typeof nativeDecompress === 'function') {
-          for (const offset of frameOffsets(chunk)) {
-            try {
-              decoded.push(nativeDecompress(chunk.subarray(offset)).toString('utf8'))
-            } catch {
-              continue
-            }
-          }
-        } else {
-          try {
-            decoded.push(Buffer.from(decompressFzstd(chunk)).toString('utf8'))
-          } catch {
-            throw new Error('DeepSeek Harness 日志解压失败，文件可能不完整')
-          }
-        }
-        return decoded
-      }
       const previousSize = parsedSizes.get(file.path)
       let resumeFrom = 0
       if (previousSize && raw.length > previousSize) {
@@ -117,11 +89,14 @@ export function createDshAdapter(homeOverride?: string, options: DshAdapterOptio
           }
         }
       }
-      let texts = decode(resumeFrom)
-      // 回溯点落在压缩数据里的伪魔数时，退回全量解析，宁可慢也不漏。
-      if (texts.length === 0 && resumeFrom > 0) texts = decode(0)
-      for (const text of texts) {
-        for (const line of text.split('\n')) {
+      const chunk = resumeFrom > 0 ? raw.subarray(resumeFrom) : raw
+      let text: string
+      try {
+        text = Buffer.concat([...decoder.decodeStreaming([chunk])]).toString('utf8')
+      } catch {
+        throw new Error('DeepSeek Harness 日志解压失败，文件可能不完整')
+      }
+      for (const line of text.split('\n')) {
           if (!line.trim()) continue
           let row: DshRow
           try {
@@ -187,7 +162,6 @@ export function createDshAdapter(homeOverride?: string, options: DshAdapterOptio
             meta: { client: 'dsh', ...(provider ? { provider } : {}) },
           })
         }
-      }
       parsedSizes.set(file.path, raw.length)
       return records
     },

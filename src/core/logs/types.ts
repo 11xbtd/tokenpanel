@@ -48,4 +48,6 @@ export interface LogSourceAdapter {
   detect(): Promise<LogDetectResult>
   listFiles(): Promise<LogFileStat[]>
   parseFile(file: LogFileStat): Promise<LogRecord[]>
+  /** 重建或归属规则变化后清掉适配器内部缓存（如 DSH 的增量解析位置）。 */
+  reset?(): void
 }

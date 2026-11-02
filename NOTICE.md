@@ -85,17 +85,20 @@ Balance/usage endpoint lists and dashboard patterns were cross-checked against
 CodexBar, api-monitor, tokscale and token-monitor (see README links). Their
 licenses apply to their own code; none is bundled here.
 
-### fzstd
+### zstddec
 
-`fzstd` is used as a pure-JavaScript Zstandard fallback so DeepSeek Harness
-logs can be read in uTools' Node 20 runtime.
+`zstddec` is used to decode DeepSeek Harness zstd session logs in both the
+browser server and uTools' Node 20 runtime. The package embeds a WebAssembly
+Zstandard decoder.
 
-<https://github.com/101arrowz/fzstd> (MIT)
+<https://github.com/donmccurdy/zstddec>
 
-Copyright (c) 2020 Arjun Barrett.
+JavaScript wrapper: MIT License, Copyright (c) 2020 Don McCurdy.
 
-Licensed under the MIT License; the permission notice in `LICENSE` applies to
-this component as well.
+Embedded Zstandard decoder: BSD 3-Clause License, Copyright (c) 2016-present,
+Yann Collet, Facebook, Inc. All rights reserved.
+
+See `node_modules/zstddec/LICENSE` in a development checkout for the full texts.
 
 ## App icon
 

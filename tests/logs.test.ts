@@ -673,7 +673,7 @@ describe('DeepSeek Harness 与 OpenCode 适配器', () => {
     expect(records[1].tokensPerSecond).toBeUndefined()
   })
 
-  it('DSH：uTools 的 Node 20 用 fzstd 回退解码多帧日志', async () => {
+  it('DSH：多帧日志整体解码', async () => {
     const zlib = await import('node:zlib')
     const compressed = (zlib as any).zstdCompressSync
     if (typeof compressed !== 'function') return
@@ -693,7 +693,7 @@ describe('DeepSeek Harness 与 OpenCode 适配器', () => {
     await fs.mkdir(path.dirname(sessionPath), { recursive: true })
     await fs.writeFile(sessionPath, Buffer.concat(frames))
 
-    const adapter = createDshAdapter(path.join(dir, 'dsh-fallback'), { forceFallback: true })
+    const adapter = createDshAdapter(path.join(dir, 'dsh-fallback'))
     const files = await adapter.listFiles()
     expect(files).toHaveLength(1)
     const records = await adapter.parseFile(files[0])
