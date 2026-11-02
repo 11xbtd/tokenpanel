@@ -12,8 +12,8 @@ AI Token 用量、余额 / 套餐额度、AI 动态与模型排行看板。形�
 
 ## 下载
 
-- [GitHub Releases](https://github.com/11xbtd/tokenpanel/releases)：Windows 便携版（自带 Node 运行时）与 uTools 插件包
-- uTools 插件应用市场（审核通过后可直接在 uTools 内安装）
+- [GitHub Releases](https://github.com/11xbtd/tokenpanel/releases)：Windows 便携版（自带 Node 运行时，约 34 MB）；已有 Node.js 22+ 可选轻量包（约 1 MB）
+- uTools 用户：在 uTools 插件应用市场搜索 **TokenPanel** 安装
 - macOS / Linux 或开发调试：按下方「快速开始」从源码运行
 
 ## 它做什么
@@ -59,16 +59,18 @@ TokenPanel 1.1.0 已启动：http://127.0.0.1:5188
 | `npm run demo` | 演示模式：生成 `./.demo-data`，端口 `:5189`，使用模拟接口 |
 | `npm run serve` | 以已构建产物启动（不自动构建） |
 | `npm run build:brands` | 从 `@lobehub/icons-static-svg` 重新生成厂商图标模块 `src/renderer/lib/brands.ts`（新增预设后需要跑一次并在 `scripts/build-brands.mjs` 的映射表里补一行） |
-| `npm run pack:utools` | 打包 `release/tokenpanel-utools-<version>.zip` |
 
 ### uTools 插件
+
+在 uTools 插件应用市场搜索 **TokenPanel** 安装。
+
+本地开发/调试：
 
 1. `npm install && npm run build`，产物在 `dist/utools/`。
 2. 打开 uTools → **开发者工具** → **新建项目** → 选择 `dist/utools/plugin.json` → **接入开发**。
 3. 在 uTools 搜索框输入 `token`、`tokenpanel`、`AI余额`、`AI动态` 或 `模型排行` 打开。
-4. 分发：`npm run pack:utools`，对方解压后在开发者工具里选择 `plugin.json`。上架 uTools 插件应用市场后可直接在 uTools 内安装；审核通过前，用开发者工具导入 `dist/utools/plugin.json`。
 
-插件默认单实例、窗口高度 760；宽度与是否可调由 uTools 控制。
+插件默认单实例、窗口高度 760；宽度与是否可调由 uTools 控制。本地构建产物仅供开发调试，对外分发统一走 uTools 插件应用市场。
 
 > **为什么产物目录里有个 `package.json`**：uTools 的 preload.js 必须是 CommonJS。产物目录如果自己没有 `package.json`，Node 会向上找到项目根的 `"type": "module"`，把 preload.js 当 ESM 加载，报 `require is not defined`——桥接注入失败，插件页会退回去请求 `/api/*`，在 `file://` 下必然全部 404。构建脚本会写入 `dist/utools/package.json`（`{"type":"commonjs"}`）并在打包后实际 `require` 一次做断言。改完 `preload.js` 需要重启 uTools 进程才生效。
 
