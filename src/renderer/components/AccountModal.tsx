@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, ExternalLink, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, ExternalLink, KeyRound, Plus, Trash2 } from 'lucide-react'
 import type {
   AccountOptions,
   AccountPublic,
@@ -7,7 +7,7 @@ import type {
   ManualWindow,
   ProviderPreset,
 } from '../../core/types'
-import { services } from '../lib/api'
+import { isUtools, services } from '../lib/api'
 import { Badge, Spinner } from './Common'
 import { Modal } from './Modal'
 import { CATEGORY_LABELS, STABILITY_LABELS } from '../lib/format'
@@ -24,17 +24,60 @@ function fromLocalInput(value: string): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({ label, hint, action, children }: { label: string; hint?: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
-      <label className="label">{label}</label>
+      {action ? (
+        <div className="flex items-center justify-between gap-2">
+          <label className="label">{label}</label>
+          {action}
+        </div>
+      ) : (
+        <label className="label">{label}</label>
+      )}
       {children}
       {hint ? <div className="mt-1 text-[10px] faint">{hint}</div> : null}
     </div>
   )
 }
 
+/** 一键跳到厂商控制台创建 / 复制 Key；uTools 里走外部浏览器打开。 */
+function KeyLink({ url, compact = false }: { url: string; compact?: boolean }) {
+  return (
+    <a
+      className="key-link"
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title="前往厂商控制台创建 / 复制 Key"
+      onClick={(event) => {
+        if (isUtools) {
+          event.preventDefault()
+          services.openExternal(url)
+        }
+      }}
+    >
+      <KeyRound size={compact ? 10 : 11} />
+      获取 Key
+      <ExternalLink size={compact ? 9 : 10} />
+    </a>
+  )
+}
+
 const EMPTY_CUSTOM: CustomHttpConfig = { method: 'GET' }
+
+/**
+ * 到期日字段一直可填（新增时就能登记），只是叫法不同：
+ * 有套餐窗口的厂商填「套餐到期日」，按量类填「充值包到期日」。
+ */
+export function expiryFieldLabel(preset: ProviderPreset): string {
+  const hasPlanWindow =
+    preset.category === 'plan' ||
+    preset.category === 'manual' ||
+    preset.category === 'custom' ||
+    preset.capabilities.includes('plan')
+  return hasPlanWindow ? '套餐到期日' : '充值包到期日'
+}
 
 export function AccountModal({
   open,
@@ -42,12 +85,14 @@ export function AccountModal({
   providers,
   onClose,
   onSaved,
+  onDeleted,
 }: {
   open: boolean
   account?: AccountPublic
   providers: ProviderPreset[]
   onClose: () => void
   onSaved: (account: AccountPublic) => Promise<void> | void
+  onDeleted?: () => void
 }) {
   const [providerId, setProviderId] = useState('deepseek')
   const [label, setLabel] = useState('')
@@ -59,11 +104,14 @@ export function AccountModal({
   const [manualAmount, setManualAmount] = useState('')
   const [manualCurrency, setManualCurrency] = useState<'CNY' | 'USD'>('CNY')
   const [planLabel, setPlanLabel] = useState('')
+  const [planExpiresAt, setPlanExpiresAt] = useState('')
   const [windows, setWindows] = useState<ManualWindow[]>([])
   const [custom, setCustom] = useState<CustomHttpConfig>(EMPTY_CUSTOM)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -80,10 +128,12 @@ export function AccountModal({
     setManualAmount(account?.options.manualBalance ? String(account.options.manualBalance.amount) : '')
     setManualCurrency(account?.options.manualBalance?.currency ?? 'CNY')
     setPlanLabel(account?.options.manualPlan?.planLabel ?? '')
+    setPlanExpiresAt(account?.options.planExpiresAt ? toLocalInput(account.options.planExpiresAt) : '')
     setWindows(account?.options.manualPlan?.windows?.map((window) => ({ ...window })) ?? [])
     setCustom(account?.options.custom ? { ...account.options.custom } : EMPTY_CUSTOM)
     setShowAdvanced(false)
     setError(null)
+    setConfirmDelete(false)
   }, [open, account?.id])
 
   const preset = useMemo(() => providers.find((provider) => provider.id === providerId) ?? providers[0], [providers, providerId])
@@ -97,6 +147,7 @@ export function AccountModal({
   }, [providers])
   const isManual = preset?.category === 'manual'
   const isCustom = preset?.category === 'custom'
+  const expiryLabel = preset ? expiryFieldLabel(preset) : '套餐到期日'
 
   const changeProvider = (id: string) => {
     const next = providers.find((provider) => provider.id === id)
@@ -106,6 +157,7 @@ export function AccountModal({
     setAuth({})
     setWindows([])
     setPlanLabel('')
+    setPlanExpiresAt('')
     setManualAmount('')
     setCustom(EMPTY_CUSTOM)
     setError(null)
@@ -122,6 +174,9 @@ export function AccountModal({
         const value = Number(quotaPerUnit)
         if (Number.isFinite(value) && value > 0) options.quotaPerUnit = value
       }
+      const expiry = fromLocalInput(planExpiresAt)
+      if (expiry !== undefined) options.planExpiresAt = expiry
+
       const thresholds: NonNullable<AccountOptions['thresholds']> = {}
       if (balanceBelow.trim() !== '') thresholds.balanceBelow = Number(balanceBelow)
       if (remainingBelow.trim() !== '') thresholds.remainingBelowPct = Number(remainingBelow)
@@ -173,6 +228,21 @@ export function AccountModal({
     }
   }
 
+  const remove = async () => {
+    if (!account) return
+    setDeleting(true)
+    setError(null)
+    try {
+      await services.deleteAccount(account.id, false)
+      onDeleted?.()
+      onClose()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught))
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   if (!preset) return null
 
   return (
@@ -184,6 +254,24 @@ export function AccountModal({
       subtitle={preset.name}
       footer={
         <>
+          {account ? (
+            <button
+              type="button"
+              className={`btn mr-auto ${confirmDelete ? 'btn-danger' : 'btn-ghost'}`}
+              disabled={deleting || saving}
+              title="删除该账户（保留历史数据）"
+              onClick={() => {
+                if (!confirmDelete) {
+                  setConfirmDelete(true)
+                  return
+                }
+                void remove()
+              }}
+            >
+              {deleting ? <Spinner size={13} /> : <Trash2 size={13} />}
+              {confirmDelete ? '确认删除？' : '删除账户'}
+            </button>
+          ) : null}
           <button type="button" className="btn" onClick={onClose}>取消</button>
           <button type="button" className="btn btn-primary" disabled={saving} onClick={() => void save()}>
             {saving ? <Spinner size={13} /> : null}
@@ -208,6 +296,7 @@ export function AccountModal({
                 接口文档 <ExternalLink size={11} />
               </button>
             ) : null}
+            {preset.keyUrl && preset.auth.length === 0 ? <KeyLink url={preset.keyUrl} compact /> : null}
           </div>
           {preset.notes ? <div className="mt-2 text-[11px] muted">{preset.notes}</div> : null}
         </div>
@@ -234,10 +323,22 @@ export function AccountModal({
           </Field>
         </div>
 
+        <Field
+          label={expiryLabel}
+          hint="订阅到期 / 续费日。多数厂商的额度接口不返回订阅有效期（MiniMax 只在控制台显示），手动登记后卡片会显示到期倒计时。"
+        >
+          <input className="input" type="datetime-local" value={planExpiresAt} onChange={(event) => setPlanExpiresAt(event.target.value)} />
+        </Field>
+
         {preset.auth.length > 0 ? (
           <div className="space-y-3">
-            {preset.auth.map((field) => (
-              <Field key={field.key} label={`${field.label}${field.required ? '' : '（可选）'}`} hint={field.help}>
+            {preset.auth.map((field, index) => (
+              <Field
+                key={field.key}
+                label={`${field.label}${field.required ? '' : '（可选）'}`}
+                hint={field.help}
+                action={index === 0 && preset.keyUrl ? <KeyLink url={preset.keyUrl} /> : undefined}
+              >
                 <input
                   className="input"
                   type="password"

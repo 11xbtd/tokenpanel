@@ -61,6 +61,20 @@ export async function statFile(file: string): Promise<{ size: number; mtimeMs: n
   }
 }
 
+/**
+ * SQLite 的新行先落在 -wal 里，主库文件的大小与时间都不变；
+ * 只看主库会把新记录当缓存命中跳过，所以把 WAL 一起算进指纹。
+ */
+export async function statSqliteFile(file: string): Promise<{ size: number; mtimeMs: number } | null> {
+  const stat = await statFile(file)
+  if (!stat) return null
+  const wal = await statFile(`${file}-wal`)
+  return {
+    size: stat.size + (wal?.size ?? 0),
+    mtimeMs: Math.max(stat.mtimeMs, wal?.mtimeMs ?? 0),
+  }
+}
+
 export async function readJsonFile<T>(file: string): Promise<T | null> {
   try {
     const raw = await fs.readFile(file, 'utf8')

@@ -235,3 +235,20 @@ describe('Store', () => {
     expect(store.queryUsage({ pageSize: 10 }).total).toBe(0)
   })
 })
+
+describe('套餐到期日', () => {
+  it('手动到期日可保存并在重开后保留', async () => {
+    const expiresAt = Date.now() + 20 * 86_400_000
+    const account = await store.saveAccount({ providerId: 'minimax-plan', auth: { planKey: 'sk-tp-test' }, options: { planExpiresAt: expiresAt } })
+    expect(account.options.planExpiresAt).toBe(expiresAt)
+    const reopened = await Store.open(dir)
+    expect(reopened.getAccount(account.id).options.planExpiresAt).toBe(expiresAt)
+  })
+
+  it('拒绝非法到期日，清空后不再保留', async () => {
+    const account = await store.saveAccount({ providerId: 'minimax-plan', auth: { planKey: 'sk-tp-test' }, options: { planExpiresAt: Date.now() + 86_400_000 } })
+    await expect(store.saveAccount({ id: account.id, providerId: 'minimax-plan', options: { planExpiresAt: -5 } })).rejects.toThrow('到期日')
+    const cleared = await store.saveAccount({ id: account.id, providerId: 'minimax-plan', options: {} })
+    expect(cleared.options.planExpiresAt).toBeUndefined()
+  })
+})

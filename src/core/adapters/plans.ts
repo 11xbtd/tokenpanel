@@ -134,9 +134,13 @@ export function zaiPlan(ctx: AdapterContext): Promise<SnapshotDraft> {
   return zaiLike(ctx, 'https://api.z.ai')
 }
 
-export async function minimaxPlan(ctx: AdapterContext): Promise<SnapshotDraft> {
-  const key = requireAuth(ctx, 'planKey', '订阅 Key')
-  const base = baseUrlOf(ctx, 'https://api.minimaxi.com')
+/** MiniMax 与千问 Token Plan共用 /v1/token_plan/remains 形状，仅鉴权字段与默认 Base URL 不同。 */
+async function tokenPlanRemains(
+  ctx: AdapterContext,
+  opts: { authKey: string; authLabel: string; fallbackBase: string; planLabel: string },
+): Promise<SnapshotDraft> {
+  const key = requireAuth(ctx, opts.authKey, opts.authLabel)
+  const base = baseUrlOf(ctx, opts.fallbackBase)
   const { data } = await jsonRequest<Record<string, any>>(ctx.fetch, {
     url: `${base}/v1/token_plan/remains`,
     headers: { Authorization: `Bearer ${key}` },
@@ -207,7 +211,11 @@ export async function minimaxPlan(ctx: AdapterContext): Promise<SnapshotDraft> {
     }
   }
   if (windows.length === 0) throw new AppError('upstream', '未返回 Token Plan 额度，字段可能已变更')
-  return planDone(windows, undefined, 'Token Plan')
+  return planDone(windows, undefined, opts.planLabel)
+}
+
+export function minimaxPlan(ctx: AdapterContext): Promise<SnapshotDraft> {
+  return tokenPlanRemains(ctx, { authKey: 'planKey', authLabel: '订阅 Key', fallbackBase: 'https://api.minimaxi.com', planLabel: 'Token Plan' })
 }
 
 export async function claudePlan(ctx: AdapterContext): Promise<SnapshotDraft> {

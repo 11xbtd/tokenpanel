@@ -1,5 +1,6 @@
 import * as balance from './balance'
 import * as plans from './plans'
+import { qianwenPlan } from './qianwen'
 import { anthropicUsage, openaiUsage } from './usage'
 import { relayBalance, relayUsage } from './relay'
 import { customQuota } from './custom'
@@ -20,6 +21,7 @@ export const ADAPTERS: Record<string, ProviderAdapter> = {
   'glm-plan': { plan: plans.glmPlan },
   'zai-plan': { plan: plans.zaiPlan },
   'minimax-plan': { plan: plans.minimaxPlan },
+  'qianwen-plan': { plan: qianwenPlan },
   'claude-plan': { plan: plans.claudePlan },
   'codex-plan': { plan: plans.codexPlan },
   'kimi-code-plan': { plan: plans.kimiCodePlan },

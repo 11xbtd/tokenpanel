@@ -33,6 +33,7 @@ export const PROVIDERS: ProviderPreset[] = [
     defaultCurrency: 'CNY',
     baseUrl: 'https://api.deepseek.com',
     docsUrl: 'https://api-docs.deepseek.com/api/get-user-balance',
+    keyUrl: 'https://platform.deepseek.com/api_keys',
     notes: '官方余额接口。美元账户会返回 USD。',
   },
   {
@@ -46,6 +47,7 @@ export const PROVIDERS: ProviderPreset[] = [
     defaultCurrency: 'CNY',
     baseUrl: 'https://api.moonshot.cn',
     docsUrl: 'https://platform.kimi.com/docs/api/balance',
+    keyUrl: 'https://platform.kimi.com/console/api-keys',
   },
   {
     id: 'kimi-global',
@@ -58,6 +60,7 @@ export const PROVIDERS: ProviderPreset[] = [
     defaultCurrency: 'USD',
     baseUrl: 'https://api.moonshot.ai',
     docsUrl: 'https://platform.kimi.com/docs/api/balance',
+    keyUrl: 'https://platform.moonshot.ai/console/api-keys',
   },
   {
     id: 'stepfun',
@@ -70,6 +73,7 @@ export const PROVIDERS: ProviderPreset[] = [
     defaultCurrency: 'CNY',
     baseUrl: 'https://api.stepfun.com',
     docsUrl: 'https://platform.stepfun.com/docs/zh/api-reference/accounts/get',
+    keyUrl: 'https://platform.stepfun.com/interface-key',
     notes: '官方余额接口。币种以接口返回为准。',
   },
   {
@@ -83,6 +87,7 @@ export const PROVIDERS: ProviderPreset[] = [
     defaultCurrency: 'USD',
     baseUrl: 'https://api.302.ai',
     docsUrl: 'https://doc.302.ai/262796252e0',
+    keyUrl: 'https://dash.302.ai/',
     notes: '需要先在后台为 Key 开启「余额查询」权限。',
   },
   {
@@ -97,6 +102,7 @@ export const PROVIDERS: ProviderPreset[] = [
     baseUrl: 'https://aihubmix.com',
     quotaPerUnit: 500000,
     docsUrl: 'https://docs.aihubmix.com/en/api/Cli',
+    keyUrl: 'https://aihubmix.com/token',
   },
   {
     id: 'novita',
@@ -109,6 +115,7 @@ export const PROVIDERS: ProviderPreset[] = [
     defaultCurrency: 'USD',
     baseUrl: 'https://api.novita.ai',
     docsUrl: 'https://docs.novita.ai/api-reference/basic-get-user-balance',
+    keyUrl: 'https://novita.ai/dashboard/key',
     notes: '接口金额单位为 1/10000 美元，插件内已换算。',
   },
   {
@@ -126,6 +133,7 @@ export const PROVIDERS: ProviderPreset[] = [
     defaultCurrency: 'USD',
     baseUrl: 'https://openrouter.ai',
     docsUrl: 'https://openrouter.ai/docs/api/api-reference/credits/get-remaining-credits',
+    keyUrl: 'https://openrouter.ai/settings/keys',
   },
   {
     id: 'xai',
@@ -138,6 +146,7 @@ export const PROVIDERS: ProviderPreset[] = [
     defaultCurrency: 'USD',
     baseUrl: 'https://management-api.x.ai',
     docsUrl: 'https://docs.x.ai/developers/rest-api-reference/management/billing',
+    keyUrl: 'https://console.x.ai/',
   },
   {
     id: 'openai-usage',
@@ -151,6 +160,7 @@ export const PROVIDERS: ProviderPreset[] = [
     baseUrl: 'https://api.openai.com',
     docsUrl:
       'https://developers.openai.com/api/reference/resources/admin/subresources/organization/subresources/usage/methods/completions/',
+    keyUrl: 'https://platform.openai.com/settings/organization/admin-keys',
     notes: '按 UTC 天桶拉取用量与费用，最长回补 30 天。',
   },
   {
@@ -164,6 +174,7 @@ export const PROVIDERS: ProviderPreset[] = [
     defaultCurrency: 'USD',
     baseUrl: 'https://api.anthropic.com',
     docsUrl: 'https://platform.claude.com/docs/en/api/usage-cost-api',
+    keyUrl: 'https://platform.claude.com/settings/keys',
     notes: '费用报告以美分返回，插件内换算为美元。',
   },
   {
@@ -176,6 +187,7 @@ export const PROVIDERS: ProviderPreset[] = [
     auth: [API_KEY],
     baseUrl: 'https://open.bigmodel.cn',
     docsUrl: 'https://github.com/steipete/CodexBar/blob/main/docs/zai.md',
+    keyUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
     notes: '非官方接口：Authorization 直接放 Key（不加 Bearer），返回 5 小时/周窗口。',
   },
   {
@@ -188,6 +200,7 @@ export const PROVIDERS: ProviderPreset[] = [
     auth: [API_KEY],
     baseUrl: 'https://api.z.ai',
     docsUrl: 'https://github.com/steipete/CodexBar/blob/main/docs/zai.md',
+    keyUrl: 'https://z.ai/manage-apikey/apikey-list',
     notes: '非官方接口，Authorization 直接放 Key（不加 Bearer）。',
   },
   {
@@ -200,7 +213,20 @@ export const PROVIDERS: ProviderPreset[] = [
     auth: [CONSOLE_TOKEN],
     baseUrl: 'https://api.minimaxi.com',
     docsUrl: 'https://platform.minimax.io/docs/m-plan/faq',
+    keyUrl: 'https://platform.minimaxi.com/user-center/basic-information/interface-key',
     notes: '按次或百分比计量；Coding Plan 返回 5 小时/周剩余百分比，字段随版本变化。国际站请在高级设置把域名改为 api.minimax.io。',
+  },
+  {
+    id: 'qianwen-plan',
+    name: '千问 Token Plan（个人版）',
+    group: '订阅套餐',
+    category: 'plan',
+    capabilities: ['plan'],
+    stability: 'experimental',
+    auth: [key('cookie', '控制台 Cookie', true, '只需 login_qianwenai_ticket=… 这一段（整段 Cookie 也可）。登录千问控制台后从任意请求的 Cookie 头里复制该段；会话过期需更新', 'login_qianwenai_ticket=...')],
+    docsUrl: 'https://platform.qianwenai.com/home/analytics/token-plan/individual',
+    keyUrl: 'https://platform.qianwenai.com/home/api-keys?target=individual',
+    notes: '个人版额度无 AK/SK / sk-sp- 接口，走控制台登录态（同 CodexBar）。Cookie 会随会话过期，失效时重新复制。',
   },
   {
     id: 'claude-plan',
@@ -240,6 +266,7 @@ export const PROVIDERS: ProviderPreset[] = [
     authOneOf: ['apiKey', 'accessToken'],
     baseUrl: 'https://api.kimi.com',
     docsUrl: 'https://github.com/steipete/CodexBar/blob/main/docs/kimi.md',
+    keyUrl: 'https://www.kimi.com/code',
     notes: 'API Key 优先，接口未在开放平台公开文档中列出；国际站把 Base URL 改为 https://api.kimi.ai。CLI Token 需额外带 X-Msh-* 设备头。',
   },
   {
@@ -270,6 +297,7 @@ export const PROVIDERS: ProviderPreset[] = [
     auth: [key('apiKey', 'API Key', true, 'OpenCode Console 订阅 Go 后复制的 Key', 'sk-...')],
     baseUrl: 'https://opencode.ai',
     docsUrl: 'https://opencode.ai/docs/go',
+    keyUrl: 'https://opencode.ai/console',
     notes: '非官方接口：GET /zen/go/v1/usage，返回 5 小时 / 每周 / 每月三个额度窗口（按模型月度金额折算）。',
   },
   {
@@ -282,6 +310,7 @@ export const PROVIDERS: ProviderPreset[] = [
     auth: [],
     defaultCurrency: 'USD',
     docsUrl: 'https://opencode.ai/docs/zen',
+    keyUrl: 'https://opencode.ai/console',
     notes: 'OpenCode Console 是按量付费的模型网关，余额查询要网页登录态，插件里只能手动登记。',
   },
   {
@@ -304,6 +333,7 @@ export const PROVIDERS: ProviderPreset[] = [
     stability: 'manual',
     auth: [],
     docsUrl: 'https://ai.google.dev/gemini-api/docs/billing',
+    keyUrl: 'https://aistudio.google.com/apikey',
     notes: '官方没有余额/额度查询 API，只能看 Cloud Billing。请手动录入。',
   },
   {
@@ -315,6 +345,7 @@ export const PROVIDERS: ProviderPreset[] = [
     stability: 'manual',
     auth: [],
     docsUrl: 'https://console.groq.com/docs/billing-faqs',
+    keyUrl: 'https://console.groq.com/keys',
     notes: '官方无公开余额接口，手动录入。',
   },
   {
@@ -326,6 +357,7 @@ export const PROVIDERS: ProviderPreset[] = [
     stability: 'manual',
     auth: [],
     docsUrl: 'https://docs.bigmodel.cn/cn/faq/fee-issues',
+    keyUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
     notes: '智谱按量账户没有公开余额接口；Coding Plan 请用上面的套餐预设。',
   },
   {
@@ -337,6 +369,7 @@ export const PROVIDERS: ProviderPreset[] = [
     stability: 'manual',
     auth: [],
     docsUrl: 'https://platform.minimax.io/docs/faq/about-account',
+    keyUrl: 'https://platform.minimaxi.com/user-center/basic-information/interface-key',
     notes: '按量余额需控制台查看，手动录入。',
   },
   {
@@ -348,6 +381,7 @@ export const PROVIDERS: ProviderPreset[] = [
     stability: 'manual',
     auth: [],
     docsUrl: 'https://help.aliyun.com/zh/user-center/developer-reference/api-bssopenapi-2017-12-14-queryaccountbalance',
+    keyUrl: 'https://bailian.console.aliyun.com/#/api-key',
     notes: '云账户余额需要 AK/SK 签名，一期未接入；请手动录入或导入账单。',
   },
   {
@@ -359,6 +393,7 @@ export const PROVIDERS: ProviderPreset[] = [
     stability: 'manual',
     auth: [],
     docsUrl: 'https://www.volcengine.com/docs/BillingCenter/QueryBalanceAcct-Queryuseraccountbalanceinformation',
+    keyUrl: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey',
     notes: '云账户余额需要 AK/SK 签名，一期未接入；请手动录入或导入账单。',
   },
   {
@@ -370,6 +405,7 @@ export const PROVIDERS: ProviderPreset[] = [
     stability: 'manual',
     auth: [],
     docsUrl: 'https://cloud.baidu.com/doc/Finance/s/Skhtyytwu',
+    keyUrl: 'https://console.bce.baidu.com/qianfan/ais/console/apiKey',
     notes: '云账户余额需要 AK/SK 签名，一期未接入。',
   },
   {
@@ -381,6 +417,7 @@ export const PROVIDERS: ProviderPreset[] = [
     stability: 'manual',
     auth: [],
     docsUrl: 'https://cloud.tencent.com/document/product/555/20253',
+    keyUrl: 'https://console.cloud.tencent.com/hunyuan/api-key',
     notes: '云账户余额需要 AK/SK 签名，一期未接入。',
   },
   {
@@ -392,6 +429,7 @@ export const PROVIDERS: ProviderPreset[] = [
     stability: 'manual',
     auth: [],
     docsUrl: 'https://platform.sensenova.cn/docs',
+    keyUrl: 'https://platform.sensenova.cn/',
     notes: '无公开余额接口。',
   },
   {
@@ -403,6 +441,7 @@ export const PROVIDERS: ProviderPreset[] = [
     stability: 'manual',
     auth: [],
     docsUrl: 'https://docs.together.ai/reference/billing-usage',
+    keyUrl: 'https://api.together.ai/settings/api-keys',
     notes: '官方用量接口需组织 Key，一期按手动/CSV 处理。',
   },
   {
@@ -414,6 +453,7 @@ export const PROVIDERS: ProviderPreset[] = [
     stability: 'manual',
     auth: [],
     docsUrl: 'https://docs.fireworks.ai/api-reference/get-billing-summary',
+    keyUrl: 'https://fireworks.ai/account/api-keys',
     notes: '官方账单接口需账户 Key，一期按手动/CSV 处理。',
   },
   {
@@ -425,6 +465,7 @@ export const PROVIDERS: ProviderPreset[] = [
     stability: 'manual',
     auth: [],
     docsUrl: 'https://docs.mistral.ai/admin/admin-api/usage-metrics',
+    keyUrl: 'https://console.mistral.ai/api-keys',
     notes: 'Admin 用量接口仅企业版，一期按手动处理。',
   },
 ]

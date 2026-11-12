@@ -47,7 +47,7 @@ import { toCsv } from '../util/csv'
 import { NewsService } from '../news/service'
 import { suggestedNewsTopics } from '../news/catalog'
 import type { NewsPreferencesInput, NewsStream } from '../news/types'
-import type { NewsFetch } from '../news/transport'
+import type { NewsArticleFetch, NewsFetch } from '../news/transport'
 import { RankingsService, type RankingsFetch } from '../rankings/service'
 import { defaultRankingsApiKey } from '../rankings/config'
 import type { RankingsSettingsInput } from '../rankings/types'
@@ -61,6 +61,7 @@ export interface AppOptions {
   enableLocalLogs?: boolean
   startupTrace?: (stage: string, detail?: unknown) => void
   newsFetchImpl?: NewsFetch
+  newsArticleFetchImpl?: NewsArticleFetch
   rankingsFetchImpl?: RankingsFetch
   rankingsSharedApiKey?: string
 }
@@ -97,7 +98,8 @@ export class TokenPanelApp {
     private readonly pricing: Pricing,
     private readonly options: AppOptions,
   ) {
-    this.fetchImpl = options.fetchImpl ?? fetch
+    // 包一层箭头函数，避免把 window.fetch 脱离 window 存起来后在 uTools 里调用报 Illegal invocation。
+    this.fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init))
   }
 
   static async create(options: AppOptions): Promise<TokenPanelApp> {
@@ -142,11 +144,15 @@ export class TokenPanelApp {
   }
 
   private getNewsService(): NewsService {
-    return this.news ??= new NewsService(this.store.dataDir, this.options.newsFetchImpl)
+    return this.news ??= new NewsService(this.store.dataDir, this.options.newsFetchImpl, Date.now, this.options.newsArticleFetchImpl)
   }
 
   getNews(force = false, stream: NewsStream = 'official', cachedOnly = false) {
     return this.getNewsService().get(suggestedNewsTopics(this.store.listAccounts(), this.settings.logSources), force, stream, cachedOnly)
+  }
+
+  getNewsArticle(url: string) {
+    return this.getNewsService().article(url)
   }
 
   updateNewsPreferences(input: NewsPreferencesInput) {

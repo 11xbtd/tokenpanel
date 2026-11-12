@@ -2,7 +2,7 @@ import type { QuotaColorThresholds } from '../../core/types'
 import { quotaColorThresholds } from '../../core/util/quota'
 
 export { formatMoney, formatPct, formatTokens } from '../../core/util/money'
-export { formatCountdown, formatDateTime, formatDuration } from '../../core/util/time'
+export { formatCountdown, formatDateTime, formatDuration, planExpiry } from '../../core/util/time'
 export { CAPABILITY_LABELS, CATEGORY_LABELS, STABILITY_LABELS } from '../../core/providers/registry'
 
 export const usdFromMicros = (micros: number): number => micros / 1_000_000

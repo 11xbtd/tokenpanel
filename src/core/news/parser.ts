@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto'
 import { load } from 'cheerio/slim'
 import type { NewsSource } from './catalog'
-import { matchingNewsTopics, NEWS_TOPICS } from './catalog'
+import { isAiMediaArticle, matchingNewsTopics, NEWS_TOPICS } from './catalog'
+import { richText } from './article'
 import type { NewsCategory, NewsItem } from './types'
 
 function plain(value: string, max = 180): string {
@@ -50,9 +51,11 @@ export function parseNews(body: string, source: NewsSource, now = Date.now()): N
     let summary = plain(rawSummary)
     if (client && summary.toLowerCase().replace(/^release:\s*/, '') === title.toLowerCase()) summary = ''
     const stream = source.stream ?? 'official'
-    const relatedTopicIds = stream === 'official' ? [source.topicId] : matchingNewsTopics(`${title} ${plain(rawSummary, 1800)}`)
-    if (!relatedTopicIds.length) return
-    const categories = newsCategories(title, plain(rawSummary, 1800), client)
+    // 媒体报道的正文常顺带提到别的厂商或价格，按标题判断主题和分类，避免张冠李戴。
+    const signal = stream === 'official' ? plain(rawSummary, 1800) : ''
+    if (stream === 'media' && !isAiMediaArticle(`${title} ${plain(rawSummary, 600)}`)) return
+    const relatedTopicIds = stream === 'official' ? [source.topicId] : matchingNewsTopics(title)
+    const categories = newsCategories(title, signal, client)
     if (!categories.length && stream !== 'official') categories.push('related')
     if (source.parser === 'minimax-notes' && !categories.includes('model')) categories.push('model')
     if (categories.length === 0) return
@@ -63,7 +66,9 @@ export function parseNews(body: string, source: NewsSource, now = Date.now()): N
     }
     const id = createHash('sha256').update(url).digest('hex').slice(0, 24)
     const topicId = stream === 'official' ? source.topicId : relatedTopicIds.find(id => NEWS_TOPICS.find(topic => topic.id === id)?.kind === 'tool') ?? relatedTopicIds[0]
-    result.set(id, { id, sourceId: source.id, topicId, relatedTopicIds, stream, title, summary, url, publishedAt, categories, prerelease })
+    // 媒体源的订阅内容本身带正文，留着就能在工具内直接读全文。
+    const content = stream === 'media' ? richText(rawSummary) : undefined
+    result.set(id, { id, sourceId: source.id, topicId, relatedTopicIds, stream, title, summary, url, publishedAt, categories, prerelease, content })
   }
 
   if (source.parser === 'feed') {

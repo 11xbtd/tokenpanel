@@ -13,6 +13,8 @@ export interface NewsSource {
   releasePrefix?: string
   watch?: { selector: string; tablesOnly?: boolean; excludeSections?: string[]; note?: string }
   feedPages?: number
+  /** 订阅内容没有正文时，回源抓原文正文用的选择器。 */
+  articleSelector?: string
 }
 
 export const NEWS_TOPICS: NewsTopic[] = [
@@ -59,8 +61,19 @@ export const NEWS_SOURCES: NewsSource[] = [
   pricing('minimax-pricing', 'minimax', 'MiniMax API 定价', 'https://platform.minimax.io/docs/pricing/overview', '.mdx-content'),
   pricing('minimax-plan', 'minimax', 'MiniMax M Plan 额度规则', 'https://platform.minimax.io/docs/m-plan/intro', '.mdx-content', false, ['supported-products']),
   pricing('codex-pricing', 'codex', 'Codex 套餐与用量规则', 'https://learn.chatgpt.com/docs/pricing', 'article', false, ['invite-friends-and-coworkers', 'feature-availability']),
-  { id: 'qbitai', topicId: 'all', stream: 'media', label: '量子位', url: 'https://www.qbitai.com/feed', website: 'https://www.qbitai.com/', parser: 'feed', feedPages: 4, allowedHosts: ['www.qbitai.com', 'qbitai.com'] },
+  { id: 'qbitai', topicId: 'all', stream: 'media', label: '量子位', url: 'https://www.qbitai.com/feed', website: 'https://www.qbitai.com/', parser: 'feed', feedPages: 4, allowedHosts: ['www.qbitai.com', 'qbitai.com'], articleSelector: '.article' },
+  { id: 'ithome', topicId: 'all', stream: 'media', label: 'IT之家', url: 'https://www.ithome.com/rss/', website: 'https://www.ithome.com/', parser: 'feed', allowedHosts: ['www.ithome.com', 'ithome.com'], articleSelector: '.post_content' },
+  { id: 'tmtpost', topicId: 'all', stream: 'media', label: '钛媒体', url: 'https://www.tmtpost.com/rss.xml', website: 'https://www.tmtpost.com/', parser: 'feed', allowedHosts: ['www.tmtpost.com', 'tmtpost.com'], articleSelector: 'article' },
+  { id: 'zhidx', topicId: 'all', stream: 'media', label: '智东西', url: 'https://www.zhidx.com/rss', website: 'https://www.zhidx.com/', parser: 'feed', allowedHosts: ['zhidx.com', 'www.zhidx.com'], articleSelector: '.post-content' },
 ]
+
+/** 媒体源会混进大量与 AI 无关的科技新闻（汽车、耳机、促销），媒体流只保留 AI 相关报道。 */
+const AI_MEDIA_PATTERN = /(?<![A-Za-z])(AI|AIGC|AGI|LLM|GPT|GLM|RLHF|RAG|MCP|GPU|NPU|TPU|NVIDIA|OpenAI|Anthropic|Claude|Gemini|DeepSeek|Kimi|MiniMax|Qwen|Grok|Llama|Copilot|Cursor|Cline|Codex|OpenCode|Windsurf|Devin|Transformer|Sora|Diffusion|Runway|Midjourney|Agent|Opus|Sonnet|Haiku|Seedream|Seedance|SiliconFlow|Moonshot|Manus)(?![A-Za-z])|大模型|大语言模型|大语言|人工智能|机器学习|深度学习|神经网络|生成式|智能体|多模态|提示词|具身智能|机器人|自动驾驶|智能驾驶|算力|智算|向量数据库|微调|蒸馏|推理模型|基础模型|深度求索|智谱|通义|千问|文心|豆包|混元|元宝|月之暗面|海螺|稀宇|英伟达|黄仁勋|编程助手|代码助手|AI编程|数字人|语音克隆|图像生成|视频生成|机器翻译|机器视觉|无人驾驶|算力中心|智算中心|训练集群|推理卡|智能芯片|硅基流动|寒武纪|液冷/i
+
+/** 媒体流按 AI 相关性取舍，不受关注对象限制。 */
+export function isAiMediaArticle(text: string): boolean {
+  return AI_MEDIA_PATTERN.test(text)
+}
 
 /** Match the article itself rather than unrelated uses of vendor and tool names. */
 export function matchingNewsTopics(text: string): string[] {

@@ -56,3 +56,19 @@ export function formatDuration(ms?: number): string {
   const minutes = Math.floor(ms / 60_000)
   return `${minutes} 分 ${Math.round((ms % 60_000) / 1000)} 秒`
 }
+
+export interface PlanExpiry {
+  /** 剩余整天数（向上取整）；已到期为 0。 */
+  days: number
+  tone: 'ok' | 'warn' | 'danger'
+  label: string
+}
+
+/** 套餐到期倒计时：7 天内预警，已到期标红。 */
+export function planExpiry(expiresAt: number | undefined, now = Date.now()): PlanExpiry | null {
+  if (!expiresAt || !Number.isFinite(expiresAt) || expiresAt <= 0) return null
+  const diff = expiresAt - now
+  if (diff <= 0) return { days: 0, tone: 'danger', label: '已到期' }
+  const days = Math.ceil(diff / DAY_MS)
+  return { days, tone: days <= 7 ? 'warn' : 'ok', label: `${days} 天后到期` }
+}

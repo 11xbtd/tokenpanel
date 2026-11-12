@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import type { LogFileStat, LogRecord, LogSourceAdapter } from '../types'
-import { displayPath, exists, statFile } from '../util'
+import { displayPath, exists, statSqliteFile } from '../util'
 
 function resolveRoot(override?: string): string {
   return override ?? process.env.ZCODE_HOME ?? path.join(os.homedir(), '.zcode')
@@ -48,7 +48,7 @@ export function createZcodeAdapter(homeOverride?: string): LogSourceAdapter {
       }
     },
     async listFiles(): Promise<LogFileStat[]> {
-      const stat = await statFile(dbPath)
+      const stat = await statSqliteFile(dbPath)
       if (!stat) return []
       return [{ path: dbPath, sessionId: 'zcode', size: stat.size, mtimeMs: stat.mtimeMs }]
     },

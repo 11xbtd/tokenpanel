@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import type { LogFileStat, LogRecord, LogSourceAdapter } from '../types'
-import { displayPath, exists, hashId, listFiles, numberValue, readJsonFile, statFile, timestampMs } from '../util'
+import { displayPath, exists, hashId, listFiles, numberValue, readJsonFile, statFile, statSqliteFile, timestampMs } from '../util'
 
 function resolveRoot(override?: string): string {
   if (override) return override
@@ -120,7 +120,7 @@ export function createOpenCodeAdapter(homeOverride?: string): LogSourceAdapter {
           mtimeMs: stat.mtimeMs,
         })
       }
-      const dbStat = await statFile(dbPath)
+      const dbStat = await statSqliteFile(dbPath)
       if (dbStat) {
         stats.push({
           path: dbPath,

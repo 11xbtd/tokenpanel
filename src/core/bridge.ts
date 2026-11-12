@@ -15,7 +15,7 @@ import type {
   WebhookTestResult,
 } from './types'
 import type { PriceOverridesFile } from './pricing/types'
-import type { NewsOverview, NewsPreferencesInput, NewsStream } from './news/types'
+import type { NewsArticle, NewsOverview, NewsPreferencesInput, NewsStream } from './news/types'
 import type { RankingsOverview, RankingsSettingsInput } from './rankings/types'
 
 export interface SaveFileResult {
@@ -35,6 +35,7 @@ export interface PanelServices {
   rebuildLogStats(): Promise<LogScanResult & { rebuilt: number }>
   getOverview(days: number): Promise<Overview>
   getNews(force?: boolean, stream?: NewsStream, cachedOnly?: boolean): Promise<NewsOverview>
+  getNewsArticle(url: string): Promise<NewsArticle>
   updateNewsPreferences(input: NewsPreferencesInput): Promise<NewsOverview>
   getRankings(force?: boolean, cachedOnly?: boolean): Promise<RankingsOverview>
   configureRankings(input: RankingsSettingsInput): Promise<RankingsOverview>

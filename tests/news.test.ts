@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { matchingNewsTopics, NEWS_SOURCES, suggestedNewsTopics } from '../src/core/news/catalog'
+import { matchingNewsTopics, NEWS_SOURCES, suggestedNewsTopics, isAiMediaArticle } from '../src/core/news/catalog'
 import { newsCategories, officialNewsUrl, parseNews } from '../src/core/news/parser'
 import { NewsService } from '../src/core/news/service'
 import { checkPricePage, priceSnapshot } from '../src/core/news/monitor'
@@ -71,6 +71,26 @@ describe('官方资讯解析', () => {
     expect(items).toHaveLength(2)
     expect(new Set(items.map(item => item.id)).size).toBe(2)
     expect(items.some(item => item.categories.includes('pricing'))).toBe(true)
+  })
+
+  it('中文媒体源保留没有厂商匹配的报道，并按各自域名限定原文链接', () => {
+    const unmatched = '<rss><channel><item><title>某国产 AI 芯片发布新处理器</title><link>https://www.ithome.com/1/025/616.htm</link><pubDate>Thu, 29 Oct 2026 08:00:00 GMT</pubDate><description>与关注厂商无关的报道</description></item><item><title>伪造链接</title><link>https://evil.example/news</link><pubDate>Thu, 29 Oct 2026 08:00:00 GMT</pubDate></item></channel></rss>'
+    const items = parseNews(unmatched, source('ithome'), now)
+    expect(items).toHaveLength(1)
+    expect(items[0]).toMatchObject({ sourceId: 'ithome', stream: 'media', categories: ['related'], url: 'https://www.ithome.com/1/025/616.htm' })
+    expect(items[0].topicId).toBeUndefined()
+    expect(items[0].relatedTopicIds).toEqual([])
+    expect(NEWS_SOURCES.filter(entry => entry.stream === 'media').map(entry => entry.label)).toEqual(['量子位', 'IT之家', '钛媒体', '智东西'])
+  })
+
+  it('媒体流只保留与 AI 相关的报道，汽车、耳机、促销等新闻被丢掉', () => {
+    const noise = '<rss><channel><item><title>长城汽车法务部：批量账号恶意攻击，将追究法律责任</title><link>https://www.ithome.com/1/025/631.htm</link><pubDate>Thu, 29 Oct 2026 08:00:00 GMT</pubDate><description>车企与水军口水战</description></item></channel></rss>'
+    const related = '<rss><channel><item><title>OpenAI 发布 GPT-6.2 模型</title><link>https://www.ithome.com/1/025/616.htm</link><pubDate>Thu, 29 Oct 2026 08:00:00 GMT</pubDate><description>新模型上线</description></item></channel></rss>'
+    expect(parseNews(noise, source('ithome'), now)).toEqual([])
+    expect(parseNews(related, source('ithome'), now)).toHaveLength(1)
+    expect(isAiMediaArticle('苹果 AirPods 京东补贴')).toBe(false)
+    expect(isAiMediaArticle('OpenAI 发布 GPT-6.2 模型')).toBe(true)
+    expect(isAiMediaArticle('黄仁勋回应出口管制')).toBe(true)
   })
 
   it('不把客户案例、安全报告和企业新闻误当作新模型发布', () => {
@@ -155,22 +175,60 @@ describe('资讯关注、缓存和失败恢复', () => {
 
   it('缓存预览无需联网，新增入口按需获取并共用关注与已读偏好', async () => {
     const called: string[] = []
-    const media = '<rss><channel><item><title>Codex 使用体验</title><link>https://www.qbitai.com/2026/10/123.html</link><pubDate>2026-10-29T08:00:00Z</pubDate><description>开发工具的周边观察</description></item><item><title>无关的机器人研究</title><link>https://www.qbitai.com/2026/10/124.html</link><pubDate>2026-10-29T08:00:00Z</pubDate></item></channel></rss>'
-    const service = new NewsService(dir, async entry => { called.push(entry.id); return entry.id === 'qbitai' ? media : officialBody(entry) }, () => now)
+    const media = (host: string) => '<rss><channel><item><title>Codex 使用体验</title><link>https://' + host + '/2026/10/123.html</link><pubDate>2026-10-29T08:00:00Z</pubDate><description>开发工具的周边观察</description></item><item><title>无关的机器人研究</title><link>https://' + host + '/2026/10/124.html</link><pubDate>2026-10-29T08:00:00Z</pubDate></item></channel></rss>'
+    const service = new NewsService(dir, async entry => { called.push(entry.id); return entry.stream === 'media' ? media(entry.allowedHosts[0]) : officialBody(entry) }, () => now)
     expect((await service.get(suggested, false, 'official', true)).topics.length).toBeGreaterThan(0)
     expect(called).toEqual([])
     const related = await service.get(suggested, false, 'media')
-    expect(called).toEqual(['qbitai'])
-    expect(related.items).toHaveLength(1)
-    expect(related.items[0]).toMatchObject({ stream: 'media', topicId: 'openai', relatedTopicIds: expect.arrayContaining(['codex', 'openai']) })
+    expect(called).toEqual(['qbitai', 'ithome', 'tmtpost', 'zhidx'])
+    expect(related.items).toHaveLength(8)
+    expect(related.items.find(item => item.sourceId === 'qbitai' && item.title === 'Codex 使用体验')).toMatchObject({ stream: 'media', topicId: 'openai', relatedTopicIds: expect.arrayContaining(['codex', 'openai']) })
+    const unmatched = related.items.find(item => item.sourceId === 'qbitai' && item.title === '无关的机器人研究')!
+    expect(unmatched.topicId).toBeUndefined()
+    expect(unmatched.categories).toEqual(['related'])
     const marked = await service.update({ stream: 'media', readIds: [related.items[0].id] }, suggested)
     expect(marked.stream).toBe('media')
     expect(marked.readIds).toContain(related.items[0].id)
     expect((await service.get(suggested, false, 'official', true)).items).toEqual([])
     await service.update({ followedTopicIds: [] }, suggested)
-    for (const stream of ['official', 'media'] as const) expect((await service.get(suggested, false, stream)).sources).toEqual([])
-    expect(called).toEqual(['qbitai'])
+    expect((await service.get(suggested, false, 'official')).sources).toEqual([])
+    expect((await service.get(suggested, false, 'media')).sources).toHaveLength(4)
+    expect(called).toEqual(['qbitai', 'ithome', 'tmtpost', 'zhidx'])
     await expect(service.get(suggested, false, 'bad' as any)).rejects.toThrow('来源类型')
+  })
+
+  it('相关报道不按关注对象过滤，关注为空时仍然返回全部媒体来源', async () => {
+    const called: string[] = []
+    const media = '<rss><channel><item><title>某国产 AI 芯片发布新处理器</title><link>https://www.ithome.com/1/025/616.htm</link><pubDate>2026-10-29T08:00:00Z</pubDate><description>与关注厂商无关的报道</description></item></channel></rss>'
+    const service = new NewsService(dir, async entry => { called.push(entry.id); return entry.stream === 'media' ? media : officialBody(entry) }, () => now)
+    const data = await service.get({ ids: ['kimi'], mode: 'accounts' }, false, 'media')
+    expect(called).toEqual(['qbitai', 'ithome', 'tmtpost', 'zhidx'])
+    expect(data.items).toHaveLength(1)
+    expect(data.items[0]).toMatchObject({ sourceId: 'ithome', stream: 'media', categories: ['related'] })
+    expect(data.items[0].topicId).toBeUndefined()
+    expect(data.sources.find(source => source.id === 'ithome')?.itemCount).toBe(1)
+  })
+
+  it('媒体报道全文可以在工具内读取，列表接口不返回正文，外站地址被拒绝', async () => {
+    const body = '正文内容'.repeat(40)
+    const withBody = `<rss><channel><item><title>OpenAI 发布 GPT-6.2 模型</title><link>https://www.ithome.com/1/025/616.htm</link><pubDate>2026-10-29T08:00:00Z</pubDate><description><p>${body}</p></description></item></channel></rss>`
+    const quoteOnly = '<rss><channel><item><title>OpenAI 发布 GPT-6.2 模型</title><link>https://www.tmtpost.com/8201187.html</link><pubDate>2026-10-29T08:00:00Z</pubDate><description>一句话摘要</description></item></channel></rss>'
+    const fetched: string[] = []
+    const service = new NewsService(
+      dir,
+      async entry => (entry.id === 'ithome' ? withBody : quoteOnly),
+      () => now,
+      async (entry, url) => { fetched.push(url); return `<html><body><article><p>原文第一段，钛媒体报道称这家公司刚刚发布了新的产品线，覆盖智能体相关的多个方向。</p><p>原文第二段，报道还提到算力成本与模型调用价格的变化。</p></article></body></html>` },
+    )
+    const data = await service.get(suggested, false, 'media')
+    expect(data.items.find(item => item.sourceId === 'ithome')?.content).toBeUndefined()
+    const cached = await service.article('https://www.ithome.com/1/025/616.htm')
+    expect(cached.content).toContain('正文内容')
+    expect(fetched).toEqual([])
+    const remote = await service.article('https://www.tmtpost.com/8201187.html')
+    expect(remote.content).toContain('原文第二段')
+    expect(fetched).toEqual(['https://www.tmtpost.com/8201187.html'])
+    await expect(service.article('https://evil.example/news')).rejects.toThrow('原文地址')
   })
 
   it('移除社区来源后拒绝旧入口，不加载或获取旧的社区缓存', async () => {

@@ -4,18 +4,22 @@ import { readJson, writeJsonAtomic } from '../storage/files'
 import { redact } from '../util/redact'
 import { NEWS_SOURCES, NEWS_TOPICS, type NewsSource } from './catalog'
 import { officialNewsUrl, parseNews } from './parser'
-import { fetchOfficialNews, type NewsFetch } from './transport'
+import { extractArticle } from './article'
+import { fetchNewsArticle, fetchOfficialNews, type NewsArticleFetch, type NewsFetch } from './transport'
 import { checkPricePage, type PriceBaseline } from './monitor'
-import type { NewsItem, NewsOverview, NewsPreferencesInput, NewsSourceStatus, NewsStream } from './types'
+import type { NewsArticle, NewsItem, NewsOverview, NewsPreferencesInput, NewsSourceStatus, NewsStream } from './types'
 
 interface Preferences { followedTopicIds?: string[]; readIds: string[] }
 interface SourceCache { parserVersion: number; items: NewsItem[]; checkedAt: number; updatedAt?: number; error?: string; baseline?: PriceBaseline }
 interface Suggested { ids: string[]; mode: 'accounts' | 'recommended' }
 const TOPIC_IDS = new Set(NEWS_TOPICS.map(topic => topic.id))
 const ITEM_ID = /^[a-f0-9]{24}$/
-const PARSER_VERSION = 3
+// 媒体报道开始按 AI 相关性取舍并带正文，旧缓存里的条目规则不同，直接作废重取。
+const PARSER_VERSION = 4
 const STREAMS = ['official', 'media']
 const MAX_ITEMS = 100
+/** 订阅内容超过这个长度才认为是正文，否则回源抓原文页面。 */
+const FEED_BODY_MIN = 120
 
 export class NewsService {
   private preferences: Preferences = { readIds: [] }
@@ -25,7 +29,7 @@ export class NewsService {
   private persistence = Promise.resolve()
   private requests = new Map<string, Promise<void>>()
 
-  constructor(private readonly dataDir: string, private readonly fetchSource: NewsFetch = fetchOfficialNews, private readonly clock = Date.now) {}
+  constructor(private readonly dataDir: string, private readonly fetchSource: NewsFetch = fetchOfficialNews, private readonly clock = Date.now, private readonly fetchArticle: NewsArticleFetch = fetchNewsArticle) {}
 
   private initialize(): Promise<void> {
     if (!this.initialized) this.initialized = (async () => {
@@ -47,8 +51,8 @@ export class NewsService {
           updatedAt: Number.isFinite(entry.updatedAt) ? entry.updatedAt : undefined,
           error: typeof entry.error === 'string' ? redact(entry.error) : undefined,
           baseline: validBaseline ? baseline : undefined,
-          items: entry.items.filter(item => item && item.sourceId === source.id && (source.topicId === 'all' ? TOPIC_IDS.has(item.topicId) : item.topicId === source.topicId) && ITEM_ID.test(item.id) && typeof item.title === 'string' && typeof item.summary === 'string' && Number.isFinite(item.publishedAt) && Array.isArray(item.categories) && item.categories.length > 0 && item.categories.every(category => ['model', 'pricing', 'client', 'related'].includes(category)) && officialNewsUrl(item.url, source))
-            .map(item => ({ ...item, stream, relatedTopicIds: Array.isArray(item.relatedTopicIds) ? item.relatedTopicIds.filter(id => TOPIC_IDS.has(id)) : [item.topicId] }))
+          items: entry.items.filter(item => item && item.sourceId === source.id && (source.topicId === 'all' ? item.topicId === undefined || TOPIC_IDS.has(item.topicId) : item.topicId === source.topicId) && ITEM_ID.test(item.id) && typeof item.title === 'string' && typeof item.summary === 'string' && Number.isFinite(item.publishedAt) && Array.isArray(item.categories) && item.categories.length > 0 && item.categories.every(category => ['model', 'pricing', 'client', 'related'].includes(category)) && officialNewsUrl(item.url, source))
+            .map(item => ({ ...item, stream, content: typeof item.content === 'string' ? item.content.slice(0, 20_000) : undefined, relatedTopicIds: Array.isArray(item.relatedTopicIds) ? item.relatedTopicIds.filter(id => TOPIC_IDS.has(id)) : item.topicId ? [item.topicId] : [] }))
             .slice(0, MAX_ITEMS),
         }
       }
@@ -90,6 +94,24 @@ export class NewsService {
     return this.overview(suggested, input.stream ?? 'official')
   }
 
+  /** 读媒体报道全文：订阅内容自带正文时直接用，否则回源抓原文页面。 */
+  async article(url: string): Promise<NewsArticle> {
+    await this.initialize()
+    if (!url || typeof url !== 'string') throw new ValidationError('原文地址无效')
+    let host = ''
+    try { host = new URL(url).hostname } catch { throw new ValidationError('原文地址无效') }
+    const source = NEWS_SOURCES.find(entry => (entry.stream ?? 'official') === 'media' && entry.allowedHosts.includes(host))
+    if (!source) throw new ValidationError('不支持的原文地址')
+    const target = officialNewsUrl(url, source)
+    if (!target) throw new ValidationError('不支持的原文地址')
+    const cached = this.cache[source.id]?.items.find(item => item.url === target)
+    if (cached?.content && cached.content.length >= FEED_BODY_MIN) return { title: cached.title, content: cached.content, url: target }
+    const html = await this.fetchArticle(source, target)
+    const article = extractArticle(html, source)
+    if (!article.content) throw new Error('原文页面没有可读的正文，可能被站点临时拦截，稍后重试')
+    return { title: article.title || cached?.title || '', content: article.content, url: target }
+  }
+
   private async refreshSource(source: NewsSource, force: boolean): Promise<void> {
     const previous = this.cache[source.id]
     const age = this.clock() - (previous?.checkedAt ?? 0)
@@ -119,22 +141,27 @@ export class NewsService {
   }
 
   private sourcesFor(followed: string[], stream: NewsStream): NewsSource[] {
-    return NEWS_SOURCES.filter(source => (source.stream ?? 'official') === stream && (source.topicId === 'all' ? followed.length > 0 : followed.includes(source.topicId)))
+    return NEWS_SOURCES.filter(source => (source.stream ?? 'official') === stream && (source.topicId === 'all' || followed.includes(source.topicId)))
   }
 
   private overview(suggested: Suggested, stream: NewsStream): NewsOverview {
     const followedTopicIds = this.preferences.followedTopicIds ?? suggested.ids
     const sources: NewsSourceStatus[] = this.sourcesFor(followedTopicIds, stream).map(source => {
       const entry = this.cache[source.id]
-      return { id: source.id, topicId: source.topicId, stream, label: source.label, url: source.website, status: !entry ? 'idle' : entry.error ? 'error' : 'ok', checkedAt: entry?.checkedAt, updatedAt: entry?.updatedAt, itemCount: entry?.items.filter(item => item.relatedTopicIds.some(id => followedTopicIds.includes(id))).length ?? 0, error: entry?.error, isMonitor: Boolean(source.watch), note: source.watch?.note, monitor: entry?.baseline ? { initializedAt: entry.baseline.initializedAt, changedAt: entry.baseline.changedAt } : undefined }
+      return { id: source.id, topicId: source.topicId, stream, label: source.label, url: source.website, status: !entry ? 'idle' : entry.error ? 'error' : 'ok', checkedAt: entry?.checkedAt, updatedAt: entry?.updatedAt, itemCount: entry?.items.filter(item => stream === 'media' || item.relatedTopicIds.some(id => followedTopicIds.includes(id))).length ?? 0, error: entry?.error, isMonitor: Boolean(source.watch), note: source.watch?.note, monitor: entry?.baseline ? { initializedAt: entry.baseline.initializedAt, changedAt: entry.baseline.changedAt } : undefined }
     })
     const items = new Map<string, NewsItem>()
     for (const source of sources) for (const item of this.cache[source.id]?.items ?? []) {
-      if (!item.relatedTopicIds.some(id => followedTopicIds.includes(id))) continue
+      if (stream === 'official' && !item.relatedTopicIds.some(id => followedTopicIds.includes(id))) continue
       const existing = items.get(item.id)
       const relatedTopicIds = [...new Set([...(existing?.relatedTopicIds ?? []), ...item.relatedTopicIds])]
-      const topicId = relatedTopicIds.find(id => followedTopicIds.includes(id) && NEWS_TOPICS.find(topic => topic.id === id)?.kind === 'tool') ?? relatedTopicIds.find(id => followedTopicIds.includes(id))!
-      items.set(item.id, { ...(existing ?? item), relatedTopicIds, topicId })
+      const topicId = relatedTopicIds.find(id => followedTopicIds.includes(id) && NEWS_TOPICS.find(topic => topic.id === id)?.kind === 'tool')
+        ?? relatedTopicIds.find(id => followedTopicIds.includes(id))
+        ?? existing?.topicId
+        ?? item.topicId
+      // 正文全文只留在本机缓存，列表接口不返回，避免响应体膨胀。
+      const { content: _content, ...rest } = existing ?? item
+      items.set(item.id, { ...rest, relatedTopicIds, topicId })
     }
     return {
       stream,

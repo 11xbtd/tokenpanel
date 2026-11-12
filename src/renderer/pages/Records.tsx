@@ -174,7 +174,7 @@ export function RecordsPage() {
         </div>
       ) : (
         <div className="card overflow-hidden">
-          <div className="table-wrap max-h-[calc(100vh-320px)] overflow-auto">
+          <div className="table-wrap max-h-[max(260px,calc(100dvh-330px))] overflow-auto">
             <table className="data-table">
               <thead>
                 <tr>

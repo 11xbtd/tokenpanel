@@ -16,7 +16,8 @@ const pluginJson = {
   main: 'index.html',
   preload: 'preload.js',
   title: 'TokenPanel',
-  pluginSetting: { single: true, height: 760 },
+  // 默认窗口贴合常见屏幕（含 720p，可用高度约 672）；uTools 会记住用户手动调整后的尺寸。
+  pluginSetting: { single: true, width: 980, height: 620, minWidth: 620, minHeight: 420 },
   features: [
     {
       code: 'token-panel',

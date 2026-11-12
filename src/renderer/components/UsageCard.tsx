@@ -1,9 +1,9 @@
 import { useState, type CSSProperties } from 'react'
-import { AlertCircle, ArrowRight, ChevronDown, GripVertical, Pencil, RefreshCw } from 'lucide-react'
+import { AlertCircle, ArrowRight, CalendarClock, ChevronDown, GripVertical, Pencil, RefreshCw } from 'lucide-react'
 import type { AccountPublic, AccountSummary, QuotaColorThresholds, QuotaWindow, WeeklyQuotaEstimate } from '../../core/types'
 import type { CardDragBinding } from '../lib/card-order'
 import { quotaColorThresholds, sortQuotaWindows, windowUsedPct } from '../../core/util/quota'
-import { formatCountdown, formatDateTime, formatDuration, formatMoney, formatSpeed, formatTokens, remainingTone } from '../lib/format'
+import { formatCountdown, formatDateTime, formatDuration, formatMoney, formatSpeed, formatTokens, planExpiry, remainingTone } from '../lib/format'
 import { providerColor, providerInkColor } from '../lib/provider-brand'
 import { useDark } from '../lib/theme'
 import { useApp } from '../lib/app-context'
@@ -101,6 +101,7 @@ export function UsageCard({ summary, account, statsSource, onRefresh, onEdit, re
   const showQuotaHero = remaining !== undefined && (statsSource === 'plan' || summary.balance === undefined)
   const heroTone = showQuotaHero ? remainingTone(remaining, thresholds) : summary.balance !== undefined ? balanceTone : undefined
   const disabled = !summary.enabled
+  const expiry = planExpiry(summary.planExpiresAt ?? account?.options.planExpiresAt)
   const hasRangeData = stats !== undefined && stats.rangeCalls > 0
   const hasHistory = stats !== undefined && (stats.allTokens > 0 || stats.rangeCalls > 0 || credits > 0)
   const cachedInput = (stats?.rangeCacheRead ?? 0) + (stats?.rangeCacheWrite ?? 0)
@@ -156,8 +157,13 @@ export function UsageCard({ summary, account, statsSource, onRefresh, onEdit, re
           <button type="button" className="account-name block max-w-full truncate text-left text-[13px] font-semibold" title={account ? `${summary.label} · 点击编辑账户` : summary.label} disabled={!account} onClick={() => account && onEdit(account)}>
             {summary.label}
           </button>
-          <div className="mt-0.5 truncate text-[10px] muted" title={summary.providerName}>
-            {summary.planLabel ?? (statsSource === 'plan' ? '订阅套餐' : '按量 API')}{summary.billingMode === 'mixed' ? ' · 混合账户' : ''}
+          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[10px] muted">
+            <span className="truncate" title={summary.providerName}>{summary.planLabel ?? (statsSource === 'plan' ? '订阅套餐' : '按量 API')}{summary.billingMode === 'mixed' ? ' · 混合账户' : ''}</span>
+            {expiry ? (
+              <span className="plan-expiry" data-tone={expiry.tone} title={`套餐到期：${formatDateTime(account?.options.planExpiresAt)}${expiry.tone === 'danger' ? '（已到期，请续费）' : ''}`}>
+                <CalendarClock size={9} />{expiry.label}
+              </span>
+            ) : null}
           </div>
         </div>
         {disabled ? <Badge>停用</Badge> : null}

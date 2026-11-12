@@ -390,6 +390,11 @@ export class Store {
         windows,
       }
     }
+    if (options?.planExpiresAt !== undefined) {
+      const value = Number(options.planExpiresAt)
+      if (!Number.isFinite(value) || value <= 0) throw new ValidationError('套餐到期日无效')
+      out.planExpiresAt = value
+    }
     if (options?.thresholds) {
       const thresholds: NonNullable<AccountOptions['thresholds']> = {}
       if (options.thresholds.balanceBelow !== undefined) {

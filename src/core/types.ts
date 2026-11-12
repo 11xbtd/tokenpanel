@@ -23,6 +23,8 @@ export interface ProviderPreset {
   baseUrl?: string
   baseUrlRequired?: boolean
   docsUrl?: string
+  /** 厂商控制台里创建 / 复制 Key 的页面，配置账户时一键跳转。 */
+  keyUrl?: string
   notes?: string
   quotaPerUnit?: number
   /** 没有公开额度接口、只能靠本机日志统计的订阅预设：token 归套餐侧，不按按量金额估算。 */
@@ -62,6 +64,8 @@ export interface AccountOptions {
   balanceSource?: 'api' | 'ledger'
   manualBalance?: { amount: number; currency: Currency }
   manualPlan?: ManualPlanConfig
+  /** 订阅套餐到期 / 续费日（手动登记）；多数厂商的额度接口不返回订阅有效期。 */
+  planExpiresAt?: number
   custom?: CustomHttpConfig
   thresholds?: {
     balanceBelow?: number
@@ -376,6 +380,8 @@ export interface AccountSummary {
   /** 周窗口的额度总量估算；缺少百分比、重置时间或本机日志时缺省。 */
   weeklyQuotaEstimates?: WeeklyQuotaEstimate[]
   planLabel?: string
+  /** 套餐到期日：优先取接口返回的订阅结束时间，回退手动登记。 */
+  planExpiresAt?: number
   todayUsd: number
   monthUsd: number
   /** 本月里厂商实际计费的部分；估算出来的金额不在界面上展示，只入库。 */

@@ -555,6 +555,7 @@ export function buildOverview(args: OverviewArgs): Overview {
       quotaForecasts,
       weeklyQuotaEstimates: weeklyQuotaEstimates.length > 0 ? weeklyQuotaEstimates : undefined,
       planLabel: manualWindows.length ? account.options.manualPlan?.planLabel : planSnapshot?.planLabel ?? balanceSnapshot?.planLabel,
+      planExpiresAt: typeof planSnapshot?.extras?.subscriptionEndTime === 'number' ? planSnapshot.extras.subscriptionEndTime : account.options.planExpiresAt,
       todayUsd: stat.todayUsd,
       monthUsd: stat.monthUsd,
       /** 本月厂商实际计费的部分（本月合计 − 估算部分）。 */

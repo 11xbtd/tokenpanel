@@ -12,7 +12,7 @@ export interface NewsTopic {
 export interface NewsItem {
   id: string
   sourceId: string
-  topicId: string
+  topicId?: string
   relatedTopicIds: string[]
   stream: NewsStream
   title: string
@@ -22,6 +22,14 @@ export interface NewsItem {
   categories: NewsCategory[]
   prerelease: boolean
   change?: { before: string; after: string }
+  /** 媒体报道的正文全文；只留在本机缓存，列表接口不返回，读全文时单独取。 */
+  content?: string
+}
+
+export interface NewsArticle {
+  title: string
+  content: string
+  url: string
 }
 
 export interface NewsSourceStatus {

@@ -45,6 +45,7 @@ const PROVIDER_PALETTES: Record<string, keyof typeof PALETTES> = {
   'zai-plan': 'neutral',
   'minimax-plan': 'minimax',
   'minimax-balance': 'minimax',
+  'qianwen-plan': 'aliyun',
   newapi: 'newapi',
   'opencode-go': 'neutral',
   'opencode-balance': 'neutral',

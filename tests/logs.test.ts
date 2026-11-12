@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createKimiCodeAdapter } from '../src/core/logs/adapters/kimiCode'
 import { createKimiCliAdapter } from '../src/core/logs/adapters/kimiCli'
 import { createClaudeCodeAdapter } from '../src/core/logs/adapters/claudeCode'
@@ -19,6 +19,7 @@ import { Pricing } from '../src/core/pricing/pricing'
 import { resetLogSourceCache, scanLocalLogs } from '../src/core/logs/scanner'
 import { buildOverview } from '../src/core/services/analytics'
 import type { AccountPublic, Settings, UsageRecord } from '../src/core/types'
+import type { LogSourceAdapter } from '../src/core/logs/types'
 import { PROVIDERS } from '../src/core/providers/registry'
 
 let dir = ''
@@ -556,6 +557,46 @@ describe('Qoder 与 ZCode 适配器', () => {
     })
   })
 
+  it('Qoder：默认同时扫描 .qoder 与 .qoder-cn 两个目录', async () => {
+    const { DatabaseSync } = await import('node:sqlite')
+    const home = vi.spyOn(os, 'homedir').mockReturnValue(dir)
+    try {
+      for (const variant of ['.qoder', '.qoder-cn']) {
+        const dbPath = path.join(dir, variant, 'shared_client', 'cache', 'db', 'local.db')
+        await fs.mkdir(path.dirname(dbPath), { recursive: true })
+        const db = new DatabaseSync(dbPath)
+        db.exec(
+          `CREATE TABLE chat_message (
+             id TEXT PRIMARY KEY, session_id TEXT, request_id TEXT, role TEXT,
+             token_info TEXT, model_info TEXT, gmt_create INTEGER)`,
+        )
+        db.prepare(
+          'INSERT INTO chat_message (id, session_id, request_id, role, token_info, model_info, gmt_create) VALUES (?,?,?,?,?,?,?)',
+        ).run(
+          `m-${variant}`,
+          's1',
+          null,
+          'assistant',
+          JSON.stringify({ prompt_tokens: 100, completion_tokens: 10 }),
+          JSON.stringify({ model_key: `model-${variant}` }),
+          1_700_000_000_000,
+        )
+        db.close()
+      }
+
+      const adapter = createQoderAdapter()
+      const detect = await adapter.detect()
+      expect(detect.available).toBe(true)
+      expect(detect.paths).toHaveLength(2)
+      const files = await adapter.listFiles()
+      expect(files).toHaveLength(2)
+      const records = (await Promise.all(files.map((file) => adapter.parseFile(file)))).flat()
+      expect(records.map((record) => record.model).sort()).toEqual(['model-.qoder', 'model-.qoder-cn'])
+    } finally {
+      home.mockRestore()
+    }
+  })
+
   it('ZCode：SQLite model_usage 带 token、耗时与真实首字耗时', async () => {
     const { DatabaseSync } = await import('node:sqlite')
     const dbPath = path.join(dir, 'zcode', 'cli', 'db', 'db.sqlite')
@@ -749,6 +790,72 @@ describe('DeepSeek Harness 与 OpenCode 适配器', () => {
 })
 
 describe('扫描与按量/套餐分离', () => {
+  it('单文件上限可按适配器覆盖：超限跳过，调高后正常导入', async () => {
+    const store = await Store.open(dir)
+    const account = await store.saveAccount({ providerId: 'deepseek', auth: { apiKey: 'sk-test' } })
+    const file = path.join(dir, 'big.jsonl')
+    await write(file, 'x'.repeat(2048))
+    const adapter: LogSourceAdapter = {
+      id: 'stub',
+      name: 'Stub',
+      description: '',
+      capabilities: { tokens: true, cache: false, speed: false, ttft: false },
+      async detect() {
+        return { available: true, paths: [file] }
+      },
+      async listFiles() {
+        return [{ path: file, sessionId: 's', size: 2048, mtimeMs: 1 }]
+      },
+      async parseFile() {
+        return [{ externalId: 'x', ts: Date.now(), model: 'custom-key', inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 0 }]
+      },
+    }
+    const pricing = new Pricing({ updatedAt: 0, models: {} }, 7.2)
+    const settings = { ...store.getSettings(), logSources: [{ id: 'stub', enabled: true, bindings: [{ accountId: account.id }] }] }
+
+    const capped = await scanLocalLogs({ store, pricing, settings, adapters: [{ ...adapter, maxFileBytes: 1024 }] })
+    expect(capped.imported).toBe(0)
+    expect(capped.sources[0].errors[0]).toContain('已跳过')
+
+    const raised = await scanLocalLogs({ store, pricing, settings, adapters: [{ ...adapter, maxFileBytes: 4096 }] })
+    expect(raised.sources[0].errors).toHaveLength(0)
+    expect(raised.imported).toBe(1)
+  })
+
+  it('SQLite 日志：新记录还在 -wal 里时也要被重新扫到', async () => {
+    const { DatabaseSync } = await import('node:sqlite')
+    const store = await Store.open(dir)
+    const account = await store.saveAccount({ providerId: 'deepseek', auth: { apiKey: 'sk-test' } })
+    const home = path.join(dir, 'qoder-home')
+    const dbPath = path.join(home, 'shared_client', 'cache', 'db', 'local.db')
+    await fs.mkdir(path.dirname(dbPath), { recursive: true })
+    const db = new DatabaseSync(dbPath)
+    try {
+      db.exec('PRAGMA journal_mode=WAL')
+      db.exec(
+        `CREATE TABLE chat_message (
+           id TEXT PRIMARY KEY, session_id TEXT, request_id TEXT, role TEXT,
+           token_info TEXT, model_info TEXT, gmt_create INTEGER)`,
+      )
+      const insert = db.prepare('INSERT INTO chat_message VALUES (?,?,?,?,?,?,?)')
+      insert.run('m1', 's1', null, 'assistant', JSON.stringify({ prompt_tokens: 100, completion_tokens: 10 }), JSON.stringify({ model_key: 'dfmodel' }), Date.now())
+
+      const adapter = createQoderAdapter(home)
+      const pricing = new Pricing({ updatedAt: 0, models: {} }, 7.2)
+      const settings = { ...store.getSettings(), logSources: [{ id: 'qoder', enabled: true, bindings: [{ accountId: account.id }] }] }
+      const scan = () => scanLocalLogs({ store, pricing, settings, adapters: [adapter] })
+      expect((await scan()).imported).toBe(1)
+
+      // 新行只进 -wal，主库文件的大小与时间不变。
+      insert.run('m2', 's1', null, 'assistant', JSON.stringify({ prompt_tokens: 200, completion_tokens: 20 }), JSON.stringify({ model_key: 'dfmodel' }), Date.now())
+      const again = await scan()
+      expect(again.sources[0].skipped).toBe(0)
+      expect(again.imported).toBe(1)
+    } finally {
+      db.close()
+    }
+  })
+
   it('Codex 解析升级自动补齐旧计时，不重复统计 token；回合完成后也能增量补齐', async () => {
     const store = await Store.open(dir)
     const preset = PROVIDERS.find((provider) => provider.id === 'codex-plan')!

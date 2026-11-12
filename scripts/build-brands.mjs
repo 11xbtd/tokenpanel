@@ -26,6 +26,7 @@ const MAP = {
   'zai-plan': 'zai',
   'minimax-plan': 'minimax-color',
   'minimax-balance': 'minimax-color',
+  'qianwen-plan': 'qwen-color',
   newapi: 'newapi-color',
   'opencode-go': 'opencode',
   'opencode-balance': 'opencode',

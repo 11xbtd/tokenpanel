@@ -2,10 +2,12 @@ import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import type { LogFileStat, LogRecord, LogSourceAdapter } from '../types'
-import { displayPath, exists, statFile } from '../util'
+import { displayPath, exists, statSqliteFile } from '../util'
 
-function resolveRoot(override?: string): string {
-  return override ?? process.env.QODER_HOME ?? path.join(os.homedir(), '.qoder')
+function resolveRoots(override?: string): string[] {
+  if (override) return [override]
+  if (process.env.QODER_HOME) return [process.env.QODER_HOME]
+  return [path.join(os.homedir(), '.qoder'), path.join(os.homedir(), '.qoder-cn')]
 }
 
 interface QoderMessageRow {
@@ -32,25 +34,33 @@ function parseJson(value: string | null): Record<string, any> | undefined {
  * 自定义模型的 model_key 不在会话日志里，这里从 model_info 读。
  */
 export function createQoderAdapter(homeOverride?: string): LogSourceAdapter {
-  const root = resolveRoot(homeOverride)
-  const dbPath = path.join(root, 'shared_client', 'cache', 'db', 'local.db')
+  const dbPaths = resolveRoots(homeOverride).map((root) => path.join(root, 'shared_client', 'cache', 'db', 'local.db'))
 
   return {
     id: 'qoder',
-    name: 'Qoder',
-    description: '读取 Qoder 本地缓存库的 chat_message.token_info；有真实 token/缓存，覆盖最近缓存的消息。',
+    name: 'Qoder / QoderCN',
+    description: '读取 Qoder/QoderCN 本地缓存库的 chat_message.token_info；有真实 token/缓存，覆盖最近缓存的消息。',
     capabilities: { tokens: true, cache: true, speed: false, ttft: false },
+    // 缓存库混着记忆嵌入等数据，会远超文本日志的 80MB；SQLite 查询不整文件读入内存。
+    maxFileBytes: 512 * 1024 * 1024,
     async detect() {
+      const found: string[] = []
+      for (const dbPath of dbPaths) {
+        if (await exists(dbPath)) found.push(displayPath(dbPath))
+      }
       return {
-        available: await exists(dbPath),
-        paths: [displayPath(dbPath)],
+        available: found.length > 0,
+        paths: found.length > 0 ? found : dbPaths.map(displayPath),
         note: 'Qoder 会话 JSONL 里 token 被清零，只有本地缓存的 chat_message 带真实 token；需要 Node 22+（浏览器版可用）。',
       }
     },
     async listFiles(): Promise<LogFileStat[]> {
-      const stat = await statFile(dbPath)
-      if (!stat) return []
-      return [{ path: dbPath, sessionId: 'qoder', size: stat.size, mtimeMs: stat.mtimeMs }]
+      const files: LogFileStat[] = []
+      for (const dbPath of dbPaths) {
+        const stat = await statSqliteFile(dbPath)
+        if (stat) files.push({ path: dbPath, sessionId: 'qoder', size: stat.size, mtimeMs: stat.mtimeMs })
+      }
+      return files
     },
     async parseFile(file: LogFileStat): Promise<LogRecord[]> {
       let DatabaseSync: typeof import('node:sqlite').DatabaseSync

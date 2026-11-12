@@ -1,4 +1,6 @@
 import { promises as fs } from 'node:fs'
+import https from 'node:https'
+import http from 'node:http'
 import path from 'node:path'
 import { TokenPanelApp } from '../core/services/app'
 import type { PanelServices } from '../core/bridge'
@@ -36,6 +38,30 @@ function dataDir(): string {
 let appPromise: Promise<TokenPanelApp> | undefined
 let startupTrace: ((stage: string, detail?: unknown) => void) | undefined
 
+/**
+ * uTools 渲染进程的 window.fetch 会丢弃 Cookie 等禁止头，导致控制台登录态接口失效。
+ * 这里用 Node https 发请求（允许 Cookie），再包成标准 Response 供适配器使用。
+ */
+function nodeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url)
+    const mod = url.protocol === 'http:' ? http : https
+    const req = mod.request(
+      url,
+      { method: init?.method ?? 'GET', headers: (init?.headers ?? {}) as Record<string, string> },
+      (res) => {
+        const chunks: Buffer[] = []
+        res.on('data', (c) => chunks.push(c))
+        res.on('end', () => resolve(new Response(Buffer.concat(chunks), { status: res.statusCode ?? 200, headers: res.headers as Record<string, string> })))
+      },
+    )
+    req.on('error', reject)
+    if (init?.signal) init.signal.addEventListener('abort', () => req.destroy(new Error('aborted')))
+    if (init?.body) req.write(init.body as string)
+    req.end()
+  })
+}
+
 function getApp(): Promise<TokenPanelApp> {
   if (!appPromise) {
     appPromise = (async () => {
@@ -45,6 +71,7 @@ function getApp(): Promise<TokenPanelApp> {
         dataDir: dir,
         mode: 'utools',
         version: VERSION,
+        fetchImpl: nodeFetch as typeof fetch,
         startupTrace: (stage, detail) => startupTrace?.(stage, detail),
         notify: (title) => {
           try {
@@ -73,6 +100,7 @@ const services: PanelServices = {
   rebuildLogStats: async () => (await getApp()).rebuildLogStats(),
   getOverview: async (days) => (await getApp()).getOverview(days),
   getNews: async (force, stream, cachedOnly) => (await getApp()).getNews(force, stream, cachedOnly),
+  getNewsArticle: async (url) => (await getApp()).getNewsArticle(url),
   updateNewsPreferences: async (input) => (await getApp()).updateNewsPreferences(input),
   getRankings: async (force, cachedOnly) => (await getApp()).getRankings(force, cachedOnly),
   configureRankings: async (input) => (await getApp()).configureRankings(input),

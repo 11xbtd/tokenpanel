@@ -42,6 +42,8 @@ export interface LogSourceAdapter {
   id: string
   /** 解析规则升级后重读原文件，用于补齐已有记录的计时字段。 */
   version?: number
+  /** 单文件上限（字节）覆盖；缺省用扫描器的文本日志上限。 */
+  maxFileBytes?: number
   name: string
   description: string
   capabilities: LogAdapterCapabilities

@@ -92,8 +92,9 @@ export async function scanLocalLogs(input: {
     const records: UsageRecord[] = []
 
     for (const file of files) {
-      if (file.size > MAX_LOG_FILE_BYTES) {
-        result.errors.push(`${path.basename(file.path)} 超过 80MB，已跳过`)
+      const maxBytes = adapter.maxFileBytes ?? MAX_LOG_FILE_BYTES
+      if (file.size > maxBytes) {
+        result.errors.push(`${path.basename(file.path)} 超过 ${Math.round(maxBytes / 1024 / 1024)}MB，已跳过`)
         continue
       }
       const previous = sourceCache[file.path]

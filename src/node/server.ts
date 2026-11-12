@@ -107,6 +107,8 @@ app.get('/api/news', async (c) => c.json(await service.getNews(c.req.query('forc
 
 app.post('/api/news/preferences', async (c) => c.json(await service.updateNewsPreferences(await readJson<NewsPreferencesInput>(c))))
 
+app.get('/api/news/article', async (c) => c.json(await service.getNewsArticle(c.req.query('url') ?? '')))
+
 app.get('/api/rankings', async (c) => c.json(await service.getRankings(c.req.query('force') === '1', c.req.query('cached') === '1')))
 
 app.post('/api/rankings/settings', async (c) => c.json(await service.configureRankings(await readJson<RankingsSettingsInput>(c))))

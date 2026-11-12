@@ -268,8 +268,8 @@ export function App() {
       <AppContext.Provider value={contextValue}>
         <div className="flex h-full min-h-0">
           <aside
-            className="hidden w-[72px] shrink-0 flex-col border-r md:flex xl:w-[188px]"
-            style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
+            className="app-sidebar hidden w-[72px] shrink-0 flex-col border-r md:flex xl:w-[188px]"
+            style={{ borderColor: 'var(--border)' }}
           >
             <div className="flex h-[64px] items-center justify-center gap-2.5 px-2 xl:justify-start xl:px-4">
               <img src={appLogo} alt="TokenPanel" width={32} height={32} className="h-8 w-8 shrink-0" />
@@ -322,8 +322,8 @@ export function App() {
 
           <div className="flex min-w-0 flex-1 flex-col">
             <header
-              className="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-4 md:h-16 md:px-5"
-              style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
+              className="app-header flex h-14 shrink-0 items-center justify-between gap-3 border-b px-4 md:h-16 md:px-5"
+              style={{ borderColor: 'var(--border)' }}
             >
               <div className="min-w-0">
                 <div className="text-[15px] font-semibold">{meta.title}</div>
@@ -368,7 +368,7 @@ export function App() {
               })}
             </nav>
 
-            <main className="min-h-0 flex-1 overflow-auto">
+            <main className="app-main min-h-0 flex-1 overflow-auto">
               {page === 'overview' ? <OverviewPage /> : null}
               {page === 'usage' ? <UsagePage /> : null}
               {page === 'records' ? <RecordsPage /> : null}
@@ -386,6 +386,10 @@ export function App() {
           providers={bootstrap.providers}
           onClose={() => setModal({ open: false })}
           onSaved={handleSaved}
+          onDeleted={() => {
+            toast.push('账户已删除', 'ok')
+            void load(true)
+          }}
         />
         <LedgerModal
           open={Boolean(ledgerAccount)}
