@@ -231,7 +231,6 @@ export function LogSourcesSettings({
         Kimi Code、新版 Codex 等日志明确提供首字耗时时会展示；缺失时显示 —。Codex 回合均速包含思考与工具等待，会标注为估算。
         归属规则顺序：带模型匹配的绑定 → 模型名自动规则 → 日志自带的厂商线索（ZCode 的 provider_id）→ 不带模型匹配的默认绑定。
         都匹配不上就不入库：宁可不统计，也不把别家的调用算进某个套餐。
-        Qoder 的 dfmodel/qfmodel 是客户端内部 key、不带厂商信息（同一个 key 也可能是你自配的 MiniMax），想固定归到某个套餐就写一条模型匹配，例如 <code>dfmodel|qfmodel</code>。
         更改归属后会清空该来源记录并重新扫描，避免同一调用算两次。
       </div>
     </div>

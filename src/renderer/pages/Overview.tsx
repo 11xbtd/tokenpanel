@@ -179,7 +179,7 @@ export function OverviewPage() {
         </div>
         {guide}
         <div className="card px-4 py-3 text-[11.5px] muted" style={{ background: 'var(--surface-2)' }}>
-          已内置 DeepSeek、Kimi、MiniMax、智谱、OpenRouter、OpenAI、Anthropic、New API 等配置，以及 Claude Code、Codex、Kimi CLI、OpenCode、Qoder、ZCode、DeepSeek Harness 等 11 类本机日志源。
+          已内置 DeepSeek、Kimi、MiniMax、智谱、OpenRouter、OpenAI、Anthropic、New API 等配置，以及 Claude Code、Codex、Kimi CLI、OpenCode、ZCode、DeepSeek Harness 等 10 类本机日志源。
         </div>
       </div>
     )
@@ -448,7 +448,7 @@ export function OverviewPage() {
           >
             {detectedSources.length === 0 ? (
               <div className="py-6 text-center text-xs muted">
-                没检测到本机日志源。装好 Claude Code、Codex、Kimi CLI、OpenCode、Qoder、ZCode、DeepSeek Harness 等任一客户端并跑过一轮，这里会出现。
+                没检测到本机日志源。装好 Claude Code、Codex、Kimi CLI、OpenCode、ZCode、DeepSeek Harness 等任一客户端并跑过一轮，这里会出现。
               </div>
             ) : (
               <div className="divide-y" style={{ borderColor: 'var(--border)' }}>

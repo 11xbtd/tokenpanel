@@ -11,7 +11,6 @@ import { createGeminiAdapter } from '../src/core/logs/adapters/gemini'
 import { createQwenAdapter } from '../src/core/logs/adapters/qwen'
 import { createClineAdapter } from '../src/core/logs/adapters/cline'
 import { createOpenCodeAdapter } from '../src/core/logs/adapters/opencode'
-import { createQoderAdapter } from '../src/core/logs/adapters/qoder'
 import { createZcodeAdapter } from '../src/core/logs/adapters/zcode'
 import { accountBillingMode, autoAccountForSource, logBillingModeForAccount, resolveAccountForRecord, suggestedProviders } from '../src/core/logs/attribution'
 import { Store } from '../src/core/storage/store'
@@ -464,7 +463,7 @@ describe('归属规则', () => {
     expect(autoAccountForSource('opencode', [balance])).toBe(balance.id)
     expect(autoAccountForSource('opencode', [balance, opencode])).toBe(opencode.id)
     // 没有对应预设的来源不乱认。
-    expect(autoAccountForSource('qoder', [opencode])).toBeUndefined()
+    expect(autoAccountForSource('unknown-source', [opencode])).toBeUndefined()
   })
 
   it('模型规则能指出"本该归到哪个账户"', () => {
@@ -520,83 +519,7 @@ describe('归属规则', () => {
   })
 })
 
-describe('Qoder 与 ZCode 适配器', () => {
-  it('Qoder：token 在 local.db 的 chat_message.token_info 里，支持自定义模型', async () => {
-    const { DatabaseSync } = await import('node:sqlite')
-    const dbPath = path.join(dir, 'qoder', 'shared_client', 'cache', 'db', 'local.db')
-    await fs.mkdir(path.dirname(dbPath), { recursive: true })
-    const db = new DatabaseSync(dbPath)
-    db.exec(
-      `CREATE TABLE chat_message (
-         id TEXT PRIMARY KEY, session_id TEXT, request_id TEXT, role TEXT,
-         token_info TEXT, model_info TEXT, gmt_create INTEGER)`,
-    )
-    const insert = db.prepare(
-      'INSERT INTO chat_message (id, session_id, request_id, role, token_info, model_info, gmt_create) VALUES (?,?,?,?,?,?,?)',
-    )
-    insert.run(
-      'm1',
-      's1',
-      'r1',
-      'assistant',
-      JSON.stringify({ prompt_tokens: 1000, completion_tokens: 100, cached_tokens: 200, max_input_tokens: 400000 }),
-      JSON.stringify({ model_key: 'my-custom-model' }),
-      1_700_000_000_000,
-    )
-    insert.run('m2', 's1', null, 'tool', '', '', 1_700_000_001_000)
-    db.close()
-
-    const records = await parseAdapter(createQoderAdapter(path.join(dir, 'qoder')))
-    expect(records).toHaveLength(1)
-    expect(records[0]).toMatchObject({
-      model: 'my-custom-model',
-      inputTokens: 800,
-      outputTokens: 100,
-      cacheReadTokens: 200,
-      cacheWriteTokens: 0,
-    })
-  })
-
-  it('Qoder：默认同时扫描 .qoder 与 .qoder-cn 两个目录', async () => {
-    const { DatabaseSync } = await import('node:sqlite')
-    const home = vi.spyOn(os, 'homedir').mockReturnValue(dir)
-    try {
-      for (const variant of ['.qoder', '.qoder-cn']) {
-        const dbPath = path.join(dir, variant, 'shared_client', 'cache', 'db', 'local.db')
-        await fs.mkdir(path.dirname(dbPath), { recursive: true })
-        const db = new DatabaseSync(dbPath)
-        db.exec(
-          `CREATE TABLE chat_message (
-             id TEXT PRIMARY KEY, session_id TEXT, request_id TEXT, role TEXT,
-             token_info TEXT, model_info TEXT, gmt_create INTEGER)`,
-        )
-        db.prepare(
-          'INSERT INTO chat_message (id, session_id, request_id, role, token_info, model_info, gmt_create) VALUES (?,?,?,?,?,?,?)',
-        ).run(
-          `m-${variant}`,
-          's1',
-          null,
-          'assistant',
-          JSON.stringify({ prompt_tokens: 100, completion_tokens: 10 }),
-          JSON.stringify({ model_key: `model-${variant}` }),
-          1_700_000_000_000,
-        )
-        db.close()
-      }
-
-      const adapter = createQoderAdapter()
-      const detect = await adapter.detect()
-      expect(detect.available).toBe(true)
-      expect(detect.paths).toHaveLength(2)
-      const files = await adapter.listFiles()
-      expect(files).toHaveLength(2)
-      const records = (await Promise.all(files.map((file) => adapter.parseFile(file)))).flat()
-      expect(records.map((record) => record.model).sort()).toEqual(['model-.qoder', 'model-.qoder-cn'])
-    } finally {
-      home.mockRestore()
-    }
-  })
-
+describe('ZCode 适配器', () => {
   it('ZCode：SQLite model_usage 带 token、耗时与真实首字耗时', async () => {
     const { DatabaseSync } = await import('node:sqlite')
     const dbPath = path.join(dir, 'zcode', 'cli', 'db', 'db.sqlite')
@@ -820,40 +743,6 @@ describe('扫描与按量/套餐分离', () => {
     const raised = await scanLocalLogs({ store, pricing, settings, adapters: [{ ...adapter, maxFileBytes: 4096 }] })
     expect(raised.sources[0].errors).toHaveLength(0)
     expect(raised.imported).toBe(1)
-  })
-
-  it('SQLite 日志：新记录还在 -wal 里时也要被重新扫到', async () => {
-    const { DatabaseSync } = await import('node:sqlite')
-    const store = await Store.open(dir)
-    const account = await store.saveAccount({ providerId: 'deepseek', auth: { apiKey: 'sk-test' } })
-    const home = path.join(dir, 'qoder-home')
-    const dbPath = path.join(home, 'shared_client', 'cache', 'db', 'local.db')
-    await fs.mkdir(path.dirname(dbPath), { recursive: true })
-    const db = new DatabaseSync(dbPath)
-    try {
-      db.exec('PRAGMA journal_mode=WAL')
-      db.exec(
-        `CREATE TABLE chat_message (
-           id TEXT PRIMARY KEY, session_id TEXT, request_id TEXT, role TEXT,
-           token_info TEXT, model_info TEXT, gmt_create INTEGER)`,
-      )
-      const insert = db.prepare('INSERT INTO chat_message VALUES (?,?,?,?,?,?,?)')
-      insert.run('m1', 's1', null, 'assistant', JSON.stringify({ prompt_tokens: 100, completion_tokens: 10 }), JSON.stringify({ model_key: 'dfmodel' }), Date.now())
-
-      const adapter = createQoderAdapter(home)
-      const pricing = new Pricing({ updatedAt: 0, models: {} }, 7.2)
-      const settings = { ...store.getSettings(), logSources: [{ id: 'qoder', enabled: true, bindings: [{ accountId: account.id }] }] }
-      const scan = () => scanLocalLogs({ store, pricing, settings, adapters: [adapter] })
-      expect((await scan()).imported).toBe(1)
-
-      // 新行只进 -wal，主库文件的大小与时间不变。
-      insert.run('m2', 's1', null, 'assistant', JSON.stringify({ prompt_tokens: 200, completion_tokens: 20 }), JSON.stringify({ model_key: 'dfmodel' }), Date.now())
-      const again = await scan()
-      expect(again.sources[0].skipped).toBe(0)
-      expect(again.imported).toBe(1)
-    } finally {
-      db.close()
-    }
   })
 
   it('Codex 解析升级自动补齐旧计时，不重复统计 token；回合完成后也能增量补齐', async () => {

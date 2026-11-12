@@ -6,8 +6,8 @@ import { getProvider } from '../providers/registry'
  * 每个厂商给一串**候选账户**，按顺序取第一个已存在的：
  * 先套餐后按量——同一个模型既可能是订阅调用（Kimi Code），
  * 也可能是按量 API key 调用（在客户端里配的 DeepSeek key），由你建了哪种账户决定。
- * Qoder 的 dfmodel/qfmodel 这类是客户端内部 key，同一个 key 可能指向任何厂商
- * （用户自配的 MiniMax 就叫 dfmodel），写死规则会算错，所以不在这里认，交给日志源里显式绑定。
+ * 客户端内部 key（如某些客户端的 dfmodel/qfmodel）不带厂商信息，同一个 key 可能指向任何厂商
+ * （用户自配的 MiniMax 也可能叫 dfmodel），写死规则会算错，所以不在这里认，交给日志源里显式绑定。
  */
 const MODEL_RULES: Array<{ pattern: RegExp; providerIds: string[] }> = [
   // 订阅专用模型名：只可能来自套餐客户端，只认套餐账户（避免把订阅调用算成按量）。

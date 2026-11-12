@@ -7,7 +7,6 @@ import { createGeminiAdapter } from './adapters/gemini'
 import { createKimiCliAdapter } from './adapters/kimiCli'
 import { createKimiCodeAdapter } from './adapters/kimiCode'
 import { createOpenCodeAdapter } from './adapters/opencode'
-import { createQoderAdapter } from './adapters/qoder'
 import { createQwenAdapter } from './adapters/qwen'
 import { createZcodeAdapter } from './adapters/zcode'
 
@@ -21,7 +20,6 @@ export function createLogAdapters(): LogSourceAdapter[] {
     createQwenAdapter(),
     createClineAdapter(),
     createOpenCodeAdapter(),
-    createQoderAdapter(),
     createZcodeAdapter(),
     createDshAdapter(),
   ]
